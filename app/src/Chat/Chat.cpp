@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <nlohmann/json.hpp>
 #include "./utils/Input.h"
+#include <fstream>
 #include "./utils/Display.h"
 #include "./utils/Time.h"
 #include "./utils/Exceptions.h"
