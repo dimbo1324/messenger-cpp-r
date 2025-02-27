@@ -25,7 +25,7 @@ TARGET = Console_chat_by_Dima_Prihodko
 # ├── Makefile
 # ------------------------------------------------------------
 
-# 2.1 Список .cpp-файлов (с префиксом app/, так как Makefile выше)
+# 2.1 Список .cpp-файлов
 SOURCES = \
 	app/main.cpp \
 	app/src/Chat/Chat.cpp \
@@ -35,7 +35,7 @@ SOURCES = \
 	app/src/Message/Message.cpp \
 	app/src/User/User.cpp
 
-# 2.2 Создаём список .o-файлов на основе .cpp
+# 2.2 Список объектов
 OBJECTS = $(SOURCES:.cpp=.o)
 
 
@@ -85,5 +85,4 @@ help:
 	@echo "  uninstall - Удалить установленный бинарник"
 	@echo "  help      - Вывести это сообщение"
 
-# Чтобы Make не искал файлы с этими именами
 .PHONY: all clean run install uninstall help
