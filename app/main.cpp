@@ -1,13 +1,11 @@
 #include <iostream>
-#include <Windows.h>
 #include "src/Chat/Chat.h"
 
 int main()
 {
     try
     {
-        SetConsoleCP(65001);
-        SetConsoleOutputCP(65001);
+
         ChatApp::Chat messenger;
         messenger.Start();
 

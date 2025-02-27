@@ -24,6 +24,28 @@ TARGET = Console_chat_by_Dima_Prihodko
 # │       └── User/
 # ├── Makefile
 # ------------------------------------------------------------
+# dimbo@dimbo:~/Programs/home_work_1/console-chat-by-Cpp$ ls -R
+# .:
+# app  Makefile  README.md
+
+# ./app:
+# main.cpp  src
+
+# ./app/src:
+# Chat  Message  User
+
+# ./app/src/Chat:
+# Chat.cpp  Chat.h  utils
+
+# ./app/src/Chat/utils:
+# Display.cpp  Display.h  Exceptions.h  Input.cpp  Input.h  Time.cpp  Time.h
+
+# ./app/src/Message:
+# Message.cpp  Message.h
+
+# ./app/src/User:
+# User.cpp  User.h
+# ------------------------------------------------------------
 
 # 2.1 Список .cpp-файлов
 SOURCES = \
