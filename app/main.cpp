@@ -3,25 +3,26 @@
 #include "src/Chat/Chat.h"
 
 int main()
+{
+    try
     {
-        try
-            {
-                SetConsoleCP(65001);
-                SetConsoleOutputCP(65001);
-                ChatApp::Chat messenger;
-                messenger.Start();
+        SetConsoleCP(65001);
+        SetConsoleOutputCP(65001);
+        ChatApp::Chat messenger;
+        messenger.Start();
 
-                while (messenger.ChatIsActive())
-                    {
-                        messenger.displayLoginMenu();
-                        while (messenger.GetCurrentUser())
-                            {
-                                messenger.displayUserMenu();
-                            }
-                    }
-            } catch (const std::exception &ex)
+        while (messenger.ChatIsActive())
+        {
+            messenger.displayLoginMenu();
+            while (messenger.GetCurrentUser())
             {
-                std::cerr << "Ошибка: " << ex.what() << std::endl;
+                messenger.displayUserMenu();
             }
-        return 0;
+        }
     }
+    catch (const std::exception &ex)
+    {
+        std::cerr << "Ошибка: " << ex.what() << std::endl;
+    }
+    return 0;
+}
