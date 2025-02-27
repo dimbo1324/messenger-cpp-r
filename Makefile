@@ -6,7 +6,7 @@
 CXX = g++
 
 # 1.2 Флаги
-CXXFLAGS = -Wall, -Wextra -02 -I./src
+CXXFLAGS = -Wall -Wextra -02 -I./src -std=c++23
 
 # 1.3 Имя исполняемого файла
 TARGET = Console_chat_by_Dima_Prihodko
@@ -65,10 +65,13 @@ run: $(TARGET)
 # 3.6 Правила
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/$(TARGET)
+	cp $(TARGET) /home/dimbo/Programs/home_work_1/bin/$(TARGET)
 
 # 3.7 Правила
 uninstall:
 	rm -f /usr/local/bin/$(TARGET)	
+	rm -f /home/dimbo/Programs/home_work_1/bin/$(TARGET)
+
 
 # ------------------------------------------------------------
 # 4. Прочее
@@ -83,6 +86,3 @@ help:
 	@echo "  help      - Вывести это сообщение"
 
 .PHONY: all clean run install uninstall help
-
-
-
