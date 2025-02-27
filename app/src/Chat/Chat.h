@@ -45,5 +45,9 @@ namespace ChatApp
         void displayLoginMenu();
 
         void displayUserMenu();
+
+        void LoaderMethod();
+
+        void DataSaver() const;
     };
 }

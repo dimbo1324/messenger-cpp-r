@@ -7,6 +7,7 @@ int main()
     {
 
         ChatApp::Chat messenger;
+        messenger.LoaderMethod();
         messenger.Start();
 
         while (messenger.ChatIsActive())
@@ -17,6 +18,7 @@ int main()
                 messenger.displayUserMenu();
             }
         }
+        messenger.DataSaver();
     }
     catch (const std::exception &ex)
     {

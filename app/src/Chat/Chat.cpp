@@ -1,6 +1,7 @@
 #include "Chat.h"
 #include <iostream>
 #include <algorithm>
+#include <nlohmann/json.hpp>
 #include "./utils/Input.h"
 #include "./utils/Display.h"
 #include "./utils/Time.h"
@@ -212,4 +213,64 @@ namespace ChatApp
             std::cout << "\n";
         }
     }
-} // namespace ChatApp
+
+    void Chat::DataSaver() const
+    {
+        nlohmann::json j;
+
+        for (const auto &pair : _usersByLogin)
+        {
+            j["users"].push_back({{"login", pair.first},
+                                  {"name", pair.second->GetUserName()},
+                                  {"password", pair.second->GetUserPassword()}});
+        }
+
+        for (const auto &msg : _messages)
+        {
+            j["messages"].push_back({{"from", msg.GetFrom()},
+                                     {"to", msg.GetTo()},
+                                     {"text", msg.GetText()},
+                                     {"timestamp", TimeUtils::FormatTimestamp(msg.GetTimestamp())}});
+        }
+
+        std::ofstream outFile("chat_state.json");
+        if (!outFile.is_open())
+        {
+            std::cerr << "Ошибка: не удалось открыть файл для сохранения состояния." << std::endl;
+            return;
+        }
+        outFile << j.dump(4);
+        outFile.close();
+    }
+
+    void Chat::LoaderMethod()
+    {
+        std::ifstream inFile("chat_state.json");
+        if (!inFile.is_open())
+        {
+            return;
+        }
+        nlohmann::json j;
+        inFile >> j;
+        inFile.close();
+
+        for (const auto &user : j["users"])
+        {
+            std::string login = user["login"];
+            std::string name = user["name"];
+            std::string password = user["password"];
+            auto newUser = std::make_shared<User>(login, password, name);
+            _usersByLogin[login] = newUser;
+            _usersByName[name] = newUser;
+        }
+
+        for (const auto &msg : j["messages"])
+        {
+            std::string from = msg["from"];
+            std::string to = msg["to"];
+            std::string text = msg["text"];
+            Message newMsg(from, to, text);
+            _messages.push_back(newMsg);
+        }
+    }
+}
