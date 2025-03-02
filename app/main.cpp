@@ -1,12 +1,18 @@
 #include <iostream>
 #include "src/Chat/Chat.h"
-#include <PlatformOSInfo.h>
+#include "PlatformOSInfo/PlatformOSInfo.h"
 
 int main()
 {
+#if defined(_WIN32)
+    initConsoleOutput();
+#endif
+
+    std::cout << "OS Info: " << getOSInfo() << std::endl;
+    std::cout << getProcessInfo() << std::endl;
+
     try
     {
-
         ChatApp::Chat messenger;
         messenger.LoaderMethod();
         messenger.Start();

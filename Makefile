@@ -55,7 +55,8 @@ SOURCES = \
 	app/src/Chat/utils/Input.cpp \
 	app/src/Chat/utils/Time.cpp \
 	app/src/Message/Message.cpp \
-	app/src/User/User.cpp
+	app/src/User/User.cpp \
+	include/PlatformOSInfo/PlatformOSInfo.cpp
 
 # 2.2 Список объектов
 OBJECTS = $(SOURCES:.cpp=.o)

@@ -9,6 +9,13 @@
 #include <sstream>
 #endif
 
+#if defined(_WIN32)
+void initConsoleOutput()
+{
+    SetConsoleOutputCP(65001);
+}
+#endif
+
 std::string getOSInfo()
 {
 #if defined(_WIN32)
