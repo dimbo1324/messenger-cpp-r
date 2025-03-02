@@ -1,5 +1,6 @@
 #include <iostream>
 #include "src/Chat/Chat.h"
+#include <PlatformOSInfo.h>
 
 int main()
 {

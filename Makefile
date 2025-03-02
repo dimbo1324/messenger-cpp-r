@@ -6,7 +6,7 @@
 CXX = g++
 
 # 1.2 Флаги компиляции
-CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./app/src
+CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./include/PlatformOSInfo -I./app/src
 
 # 1.3 Имя итогового исполняемого файла
 TARGET = Console_chat_by_Dima_Prihodko
