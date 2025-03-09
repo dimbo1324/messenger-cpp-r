@@ -3,11 +3,11 @@
 #include <iostream>
 
 namespace ChatApp
+{
+    namespace InputUtils
     {
-        namespace InputUtils
-            {
-                char ReadOption();
+        char ReadOption();
 
-                std::string ReadLine();
-            }
+        std::string ReadLine();
     }
+}

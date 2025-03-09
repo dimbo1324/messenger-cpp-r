@@ -1,27 +1,35 @@
 #include <iostream>
-#include <Windows.h>
 #include "src/Chat/Chat.h"
+#include "PlatformOSInfo/PlatformOSInfo.h"
 
 int main()
-    {
-        try
-            {
-                SetConsoleCP(65001);
-                SetConsoleOutputCP(65001);
-                ChatApp::Chat messenger;
-                messenger.Start();
+{
+#if defined(_WIN32)
+    initConsoleOutput();
+#endif
 
-                while (messenger.ChatIsActive())
-                    {
-                        messenger.displayLoginMenu();
-                        while (messenger.GetCurrentUser())
-                            {
-                                messenger.displayUserMenu();
-                            }
-                    }
-            } catch (const std::exception &ex)
+    std::cout << "OS Info: " << getOSInfo() << std::endl;
+    std::cout << getProcessInfo() << std::endl;
+
+    try
+    {
+        ChatApp::Chat messenger;
+        messenger.LoaderMethod();
+        messenger.Start();
+
+        while (messenger.ChatIsActive())
+        {
+            messenger.displayLoginMenu();
+            while (messenger.GetCurrentUser())
             {
-                std::cerr << "Ошибка: " << ex.what() << std::endl;
+                messenger.displayUserMenu();
             }
-        return 0;
+        }
+        messenger.DataSaver();
     }
+    catch (const std::exception &ex)
+    {
+        std::cerr << "Ошибка: " << ex.what() << std::endl;
+    }
+    return 0;
+}

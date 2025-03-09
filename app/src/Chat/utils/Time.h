@@ -3,9 +3,9 @@
 #include <chrono>
 
 namespace ChatApp
+{
+    namespace TimeUtils
     {
-        namespace TimeUtils
-            {
-                std::string FormatTimestamp(const std::chrono::system_clock::time_point &tp);
-            }
+        std::string FormatTimestamp(const std::chrono::system_clock::time_point &tp);
     }
+}
