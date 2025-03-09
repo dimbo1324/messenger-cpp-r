@@ -4,6 +4,7 @@
 #include "network/server/serverProps.h"
 #include "network/server/ClientHandler/ClientHandler.h"
 #include "network/server/ServerConnection/ServerConnection.h"
+#include "network/client/ChatClient/ChatClient.h"
 
 int main()
 {
