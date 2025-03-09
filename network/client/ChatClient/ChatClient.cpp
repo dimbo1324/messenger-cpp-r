@@ -1,5 +1,5 @@
 #include <iostream>
-
+#include <thread>
 #include "ChatClient.h"
 #include "../Chat/utils/Input.h"
 #include "../Chat/utils/Display.h"
@@ -114,7 +114,16 @@ namespace ChatApp
 
     void ChatClient::displayChat()
     {
-        // Пока заглушка, позже добавить запрос к серверу
-        std::cout << "Чат пока недоступен.\n";
+        std::string request = "GET_MESSAGES";
+        std::string response = _connection.sendRequest(request);
+        if (response != "ERROR:Нет ответа от сервера")
+        {
+            std::cout << "Сообщения:\n"
+                      << response << std::endl;
+        }
+        else
+        {
+            std::cout << "Не удалось получить сообщения.\n";
+        }
     }
 }

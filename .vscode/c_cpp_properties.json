@@ -3,19 +3,17 @@
     {
       "name": "windows-gcc-x64",
       "includePath": [
-        "${workspaceFolder}",
-        "${workspaceFolder}/include",
-        "${workspaceFolder}/src",
-        "${workspaceFolder}/network",
-        "${workspaceFolder}/network/client",
-        "${workspaceFolder}/network/server"
+        "${workspaceFolder}/**"
       ],
       "compilerPath": "C:/msys64/ucrt64/bin/gcc.exe",
-      "cStandard": "c11",
-      "cppStandard": "c++23",
+      "cStandard": "${default}",
+      "cppStandard": "${default}",
       "intelliSenseMode": "windows-gcc-x64",
-      "compilerArgs": []
+      "compilerArgs": [
+        ""
+      ]
     }
   ],
   "version": 4
+}
 }

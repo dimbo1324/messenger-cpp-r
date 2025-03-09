@@ -1,11 +1,13 @@
 #include "ChatServer.h"
 #include "../Chat/utils/Exceptions.h"
 #include <sstream>
+#include <mutex>
 
 namespace ChatApp
 {
     bool ChatServer::registerUser(const std::string &login, const std::string &password, const std::string &name)
     {
+        std::lock_guard<std::mutex> lock(usersMutex);
         if (_usersByLogin.find(login) != _usersByLogin.end() || login == "всем")
         {
             throw UserLoginException();
@@ -22,6 +24,7 @@ namespace ChatApp
 
     std::shared_ptr<User> ChatServer::authenticate(const std::string &login, const std::string &password)
     {
+        std::lock_guard<std::mutex> lock(usersMutex);
         auto user = _usersByLogin.find(login);
         if (user != _usersByLogin.end() && user->second->GetUserPassword() == password)
         {
@@ -32,6 +35,7 @@ namespace ChatApp
 
     void ChatServer::addMessage(const std::string &from, const std::string &to, const std::string &text)
     {
+        std::lock_guard<std::mutex> lock(messagesMutex);
         _messages.emplace_back(from, to, text);
     }
 
@@ -65,6 +69,16 @@ namespace ChatApp
         {
             addMessage(arg1, arg2, arg3);
             return "OK";
+        }
+        else if (command == "GET_MESSAGES")
+        {
+            std::lock_guard<std::mutex> lock(messagesMutex);
+            std::string messages;
+            for (const auto &msg : _messages)
+            {
+                messages += msg.GetFrom() + " -> " + msg.GetTo() + ": " + msg.GetText() + "\n";
+            }
+            return messages.empty() ? "Нет сообщений" : messages;
         }
         return "ERROR:Неизвестная команда";
     }

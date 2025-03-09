@@ -1,9 +1,9 @@
 #include <string>
 #include <iostream>
-
 #include "ClientHandler.h"
 #include "serverProps.h"
 #include "messages.h"
+#include "../ChatServer/ChatServer.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -14,37 +14,30 @@
 #include <errno.h>
 #endif
 
-void ClientHandler::handleClient(int clientSocket)
+void ClientHandler::handleClient(int clientSocket, ChatServer &server)
 {
     char buffer[BUF_SIZE];
-    int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
-    if (bytesRead > 0)
+    while (true)
     {
-        buffer[bytesRead] = '\0';
-        std::cout << SERVER_MESSAGES::MESSAGE_RECEIVED << buffer << std::endl;
-    }
-    else if (bytesRead == 0)
-    {
-        std::cout << SERVER_MESSAGES::CLIENT_DISCONNECTED << std::endl;
-    }
-    else
-    {
-        std::cerr << SERVER_MESSAGES::RECV_ERROR << std::endl;
-    }
-
-    std::string response = "Привет, клиент!";
-    int bytesSent = send(clientSocket, response.c_str(), response.length(), 0);
-    if (bytesSent == -1)
-    {
-#ifdef _WIN32
-        std::cerr << SERVER_MESSAGES::SEND_ERROR << WSAGetLastError() << std::endl;
-#else
-        std::cerr << SERVER_MESSAGES::SEND_ERROR << errno << std::endl;
-#endif
-    }
-    else
-    {
-        std::cout << SERVER_MESSAGES::RESPONSE_SENT << std::endl;
+        int bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        if (bytesRead > 0)
+        {
+            buffer[bytesRead] = '\0';
+            std::cout << SERVER_MESSAGES::MESSAGE_RECEIVED << buffer << std::endl;
+            std::string request(buffer);
+            std::string response = server.handleRequest(request);
+            send(clientSocket, response.c_str(), response.length(), 0);
+        }
+        else if (bytesRead == 0)
+        {
+            std::cout << SERVER_MESSAGES::CLIENT_DISCONNECTED << std::endl;
+            break;
+        }
+        else
+        {
+            std::cerr << SERVER_MESSAGES::RECV_ERROR << std::endl;
+            break;
+        }
     }
 
 #ifdef _WIN32

@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <mutex>
 #include "../User/User.h"
 #include "../Message/Message.h"
 
@@ -13,6 +14,8 @@ namespace ChatApp
         std::unordered_map<std::string, std::shared_ptr<User>> _usersByLogin;
         std::unordered_map<std::string, std::shared_ptr<User>> _usersByName;
         std::vector<Message> _messages;
+        std::mutex usersMutex;
+        std::mutex messagesMutex;
 
     public:
         bool registerUser(const std::string &login, const std::string &password, const std::string &name);

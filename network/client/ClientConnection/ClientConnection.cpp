@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 #include "ClientConnection.h"
 
 #ifdef _WIN32
@@ -41,6 +42,10 @@ namespace ChatApp
 #endif
             _socket = -1;
         }
+        else
+        {
+            std::thread(&ClientConnection::receiveMessages, this).detach();
+        }
     }
 
     ClientConnection::~ClientConnection()
@@ -69,5 +74,29 @@ namespace ChatApp
             return std::string(buffer);
         }
         return "ERROR:Нет ответа от сервера";
+    }
+
+    void ClientConnection::receiveMessages()
+    {
+        char buffer[1024];
+        while (true)
+        {
+            int bytesReceived = recv(_socket, buffer, sizeof(buffer) - 1, 0);
+            if (bytesReceived > 0)
+            {
+                buffer[bytesReceived] = '\0';
+                std::cout << "Новое сообщение: " << buffer << std::endl;
+            }
+            else if (bytesReceived == 0)
+            {
+                std::cout << "Сервер отключился.\n";
+                break;
+            }
+            else
+            {
+                std::cerr << "Ошибка при получении сообщения.\n";
+                break;
+            }
+        }
     }
 }

@@ -6,7 +6,9 @@
 #include <sys/socket.h>
 #endif
 
+#include "../ChatServer/ChatServer.h"
+
 namespace ClientHandler
 {
-    void handleClient(int clientSocket);
+    void handleClient(int clientSocket, ChatServer &server);
 }

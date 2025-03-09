@@ -5,6 +5,7 @@
 #include "network/server/ClientHandler/ClientHandler.h"
 #include "network/server/ServerConnection/ServerConnection.h"
 #include "network/client/ChatClient/ChatClient.h"
+#include "network/server/ChatServer/ChatServer.h"
 
 int main()
 {
@@ -26,12 +27,14 @@ int main()
 
     std::cout << SERVER_MESSAGES::SERVER_STARTED << PORT << std::endl;
 
+    ChatServer chatServer;
+
     while (true)
     {
         int clientSocket = server.acceptClient();
         if (clientSocket != -1)
         {
-            std::thread clientThread(ClientHandler::handleClient, clientSocket);
+            std::thread clientThread(ClientHandler::handleClient, clientSocket, std::ref(chatServer));
             clientThread.detach();
         }
     }
