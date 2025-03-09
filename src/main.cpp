@@ -1,35 +1,42 @@
+#include <thread>
 #include <iostream>
-#include "src/Chat/Chat.h"
-#include "PlatformOSInfo/PlatformOSInfo.h"
+#include "network/utils/messages.h"
+#include "network/server/serverProps/constants.h"
+#include "network/server/ClientHandler/ClientHandler.h"
+#include "network/server/ServerConnection/ServerConnection.h"
 
 int main()
 {
-#if defined(_WIN32)
-    initConsoleOutput();
+#ifdef _WIN32
+    SetConsoleOutputCP(65001);
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+        std::cerr << SERVER_MESSAGES::WINSOCK_INIT_ERROR << WSAGetLastError() << std::endl;
+        return 1;
+    }
 #endif
 
-    std::cout << "OS Info: " << getOSInfo() << std::endl;
-    std::cout << getProcessInfo() << std::endl;
-
-    try
+    ServerConnection server;
+    if (!server.initialize())
     {
-        ChatApp::Chat messenger;
-        messenger.LoaderMethod();
-        messenger.Start();
+        return 1;
+    }
 
-        while (messenger.ChatIsActive())
+    std::cout << SERVER_MESSAGES::SERVER_STARTED << PORT << std::endl;
+
+    while (true)
+    {
+        int clientSocket = server.acceptClient();
+        if (clientSocket != -1)
         {
-            messenger.displayLoginMenu();
-            while (messenger.GetCurrentUser())
-            {
-                messenger.displayUserMenu();
-            }
+            std::thread clientThread(ClientHandler::handleClient, clientSocket);
+            clientThread.detach();
         }
-        messenger.DataSaver();
     }
-    catch (const std::exception &ex)
-    {
-        std::cerr << "Ошибка: " << ex.what() << std::endl;
-    }
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
     return 0;
 }
