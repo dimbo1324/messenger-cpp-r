@@ -1,8 +1,7 @@
 #include <iostream>
-
 #include "ServerConnection.h"
-#include "serverProps/constants.h"
-#include "Network/utils/messages.h"
+#include "serverProps.h"
+#include "messages.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -15,7 +14,17 @@
 #include <errno.h>
 #endif
 
-ServerConnection::ServerConnection() : serverSocket(-1) {}
+ServerConnection::ServerConnection() : serverSocket(-1)
+{
+#ifdef _WIN32
+    WSADATA wsaData;
+    int wsaInit = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (wsaInit != 0)
+    {
+        std::cerr << "Ошибка инициализации Winsock: " << wsaInit << std::endl;
+    }
+#endif
+}
 
 ServerConnection::~ServerConnection()
 {
@@ -24,6 +33,7 @@ ServerConnection::~ServerConnection()
     {
         closesocket(serverSocket);
     }
+    WSACleanup();
 #else
     if (serverSocket != -1)
     {

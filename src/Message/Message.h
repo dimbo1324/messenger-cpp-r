@@ -17,11 +17,11 @@ namespace ChatApp
         Message(const std::string &from, const std::string &to, const std::string &text);
 
         const std::string &GetFrom() const;
-
         const std::string &GetTo() const;
-
         const std::string &GetText() const;
-
         std::chrono::system_clock::time_point GetTimestamp() const;
+
+        std::string serialize() const;
+        static Message deserialize(const std::string &jsonStr);
     };
 }

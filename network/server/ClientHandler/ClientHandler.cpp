@@ -1,5 +1,8 @@
 #include <string>
 #include <iostream>
+#include <vector>
+#include <cstring>
+#include <mutex>
 #include "ClientHandler.h"
 #include "serverProps.h"
 #include "messages.h"
@@ -14,19 +17,37 @@
 #include <errno.h>
 #endif
 
+// Определяем флаг остановки
+std::atomic<bool> ClientHandler::stopFlag(false);
+
 void ClientHandler::handleClient(int clientSocket, ChatServer &server)
 {
-    char buffer[BUF_SIZE];
-    while (true)
+    const size_t initialBufSize = BUF_SIZE;
+    std::vector<char> buffer(initialBufSize);
+
+    while (!stopFlag)
     {
-        int bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+        // Читаем данные, если сообщение превышает начальный размер, увеличиваем буфер
+        int bytesRead = recv(clientSocket, buffer.data(), buffer.size() - 1, 0);
         if (bytesRead > 0)
         {
             buffer[bytesRead] = '\0';
-            std::cout << SERVER_MESSAGES::MESSAGE_RECEIVED << buffer << std::endl;
-            std::string request(buffer);
+            std::cout << SERVER_MESSAGES::MESSAGE_RECEIVED << buffer.data() << std::endl;
+
+            std::string request(buffer.data());
             std::string response = server.handleRequest(request);
-            send(clientSocket, response.c_str(), response.length(), 0);
+
+            // Отправка данных с обработкой ошибок
+            int bytesSent = send(clientSocket, response.c_str(), response.length(), 0);
+            if (bytesSent == -1)
+            {
+#ifdef _WIN32
+                std::cerr << "Ошибка отправки данных: " << WSAGetLastError() << std::endl;
+#else
+                std::cerr << "Ошибка отправки данных: " << strerror(errno) << std::endl;
+#endif
+                break;
+            }
         }
         else if (bytesRead == 0)
         {
@@ -35,7 +56,11 @@ void ClientHandler::handleClient(int clientSocket, ChatServer &server)
         }
         else
         {
-            std::cerr << SERVER_MESSAGES::RECV_ERROR << std::endl;
+#ifdef _WIN32
+            std::cerr << "Ошибка при получении сообщения: " << WSAGetLastError() << std::endl;
+#else
+            std::cerr << "Ошибка при получении сообщения: " << strerror(errno) << std::endl;
+#endif
             break;
         }
     }

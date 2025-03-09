@@ -3,9 +3,15 @@
 #include "ChatClient.h"
 #include "../Chat/utils/Input.h"
 #include "../Chat/utils/Display.h"
+#include <sstream>
+#include <stdexcept>
+#include <algorithm>
 #ifdef GetUserName
 #undef GetUserName
 #endif
+
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 namespace ChatApp
 {
@@ -38,20 +44,34 @@ namespace ChatApp
 
     void ChatClient::login()
     {
-        std::string login, password;
+        std::string login, password, username;
         std::cout << "Логин: ";
-        std::cin >> login;
+        std::getline(std::cin, login);
         std::cout << "Пароль: ";
-        std::cin >> password;
+        std::getline(std::cin, password);
+        std::cout << "Имя для отображения: ";
+        std::getline(std::cin, username);
+
         std::string request = "LOGIN:" + login + ":" + password;
-        std::string response = _connection.sendRequest(request);
-        if (response == "OK")
+        try
         {
-            _currentUser = std::make_shared<User>(login, password, login); // Имя временно = логин
+            if (!_connection.isConnected())
+            {
+                throw std::runtime_error("Нет соединения с сервером");
+            }
+            std::string response = _connection.sendRequest(request);
+            if (response == "OK")
+            {
+                _currentUser = std::make_shared<User>(login, password, username);
+            }
+            else
+            {
+                std::cout << "Ошибка: " << response << std::endl;
+            }
         }
-        else
+        catch (const std::exception &ex)
         {
-            std::cout << response << std::endl;
+            std::cout << "Ошибка при входе: " << ex.what() << std::endl;
         }
     }
 
@@ -59,17 +79,29 @@ namespace ChatApp
     {
         std::string login, password, name;
         std::cout << "Логин: ";
-        std::cin >> login;
+        std::getline(std::cin, login);
         std::cout << "Пароль: ";
-        std::cin >> password;
+        std::getline(std::cin, password);
         std::cout << "Имя: ";
-        std::cin >> name;
+        std::getline(std::cin, name);
+
         std::string request = "REGISTER:" + login + ":" + password + ":" + name;
-        std::string response = _connection.sendRequest(request);
-        std::cout << response << std::endl;
-        if (response == "OK")
+        try
         {
-            _currentUser = std::make_shared<User>(login, password, name);
+            if (!_connection.isConnected())
+            {
+                throw std::runtime_error("Нет соединения с сервером");
+            }
+            std::string response = _connection.sendRequest(request);
+            std::cout << response << std::endl;
+            if (response == "OK")
+            {
+                _currentUser = std::make_shared<User>(login, password, name);
+            }
+        }
+        catch (const std::exception &ex)
+        {
+            std::cout << "Ошибка при регистрации: " << ex.what() << std::endl;
         }
     }
 
@@ -77,13 +109,24 @@ namespace ChatApp
     {
         std::string to, text;
         std::cout << "Кому ('всем' для всех): ";
-        std::cin >> to;
+        std::getline(std::cin, to);
         std::cout << "Текст: ";
-        std::cin.ignore();
         std::getline(std::cin, text);
+
         std::string request = "MESSAGE:" + _currentUser->GetUserLogin() + ":" + to + ":" + text;
-        std::string response = _connection.sendRequest(request);
-        std::cout << response << std::endl;
+        try
+        {
+            if (!_connection.isConnected())
+            {
+                throw std::runtime_error("Нет соединения с сервером");
+            }
+            std::string response = _connection.sendRequest(request);
+            std::cout << response << std::endl;
+        }
+        catch (const std::exception &ex)
+        {
+            std::cout << "Ошибка при отправке сообщения: " << ex.what() << std::endl;
+        }
     }
 
     void ChatClient::displayUserMenu()
@@ -115,15 +158,32 @@ namespace ChatApp
     void ChatClient::displayChat()
     {
         std::string request = "GET_MESSAGES";
-        std::string response = _connection.sendRequest(request);
-        if (response != "ERROR:Нет ответа от сервера")
+        try
         {
-            std::cout << "Сообщения:\n"
-                      << response << std::endl;
+            if (!_connection.isConnected())
+            {
+                throw std::runtime_error("Нет соединения с сервером");
+            }
+            std::string response = _connection.sendRequest(request);
+            try
+            {
+                auto jsonResponse = json::parse(response);
+                std::cout << "Сообщения:\n";
+                for (auto &message : jsonResponse["messages"])
+                {
+                    std::cout << message["from"].get<std::string>() << ": "
+                              << message["text"].get<std::string>() << "\n";
+                }
+            }
+            catch (json::parse_error &)
+            {
+                std::cout << "Сообщения (не JSON):\n"
+                          << response << std::endl;
+            }
         }
-        else
+        catch (const std::exception &ex)
         {
-            std::cout << "Не удалось получить сообщения.\n";
+            std::cout << "Ошибка при получении сообщений: " << ex.what() << std::endl;
         }
     }
 }
