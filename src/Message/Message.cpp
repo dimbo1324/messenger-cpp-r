@@ -36,7 +36,8 @@ namespace ChatApp
         j["to"] = _to;
         j["text"] = _text;
         j["timestamp"] = std::chrono::duration_cast<std::chrono::seconds>(
-                             _timestamp.time_since_epoch()).count();
+                             _timestamp.time_since_epoch())
+                             .count();
         return j.dump();
     }
 
@@ -47,10 +48,9 @@ namespace ChatApp
         std::string to = j["to"];
         std::string text = j["text"];
         auto timestampSeconds = j["timestamp"].get<long long>();
-        std::chrono::system_clock::time_point timestamp(
-            std::chrono::seconds(timestampSeconds));
+        std::chrono::system_clock::time_point timestamp{std::chrono::seconds{timestampSeconds}};
         Message msg(from, to, text);
-        const_cast<std::chrono::system_clock::time_point&>(msg._timestamp) = timestamp;
+        msg._timestamp = timestamp;
         return msg;
     }
 }
