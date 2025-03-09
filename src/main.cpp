@@ -1,7 +1,7 @@
 #include <thread>
 #include <iostream>
-#include "network/utils/messages.h"
-#include "network/server/serverProps/constants.h"
+#include "network/server/messages.h"
+#include "network/server/serverProps.h"
 #include "network/server/ClientHandler/ClientHandler.h"
 #include "network/server/ServerConnection/ServerConnection.h"
 

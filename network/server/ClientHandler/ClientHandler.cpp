@@ -2,8 +2,8 @@
 #include <iostream>
 
 #include "ClientHandler.h"
-#include "serverProps/constants.h"
-#include "Network/utils/messages.h"
+#include "serverProps.h"
+#include "messages.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
