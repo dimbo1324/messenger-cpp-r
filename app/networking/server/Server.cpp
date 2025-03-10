@@ -26,7 +26,7 @@ namespace Networking
 
     bool Server::start()
     {
-        serverSocket_ = socket(AF_INET, SOCK_STREAM, 0);
+        serverSocket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (serverSocket_ == INVALID_SOCKET_VALUE)
         {
             std::cerr << serverMessages::SERVER_SOCKET_ERROR << std::endl;
