@@ -169,7 +169,15 @@ namespace NetApp
             {
                 if (!message.empty())
                 {
-                    std::cout << message << std::endl;
+                    std::istringstream msgStream(message);
+                    std::string tsStr, from, to, text;
+                    msgStream >> tsStr >> from >> to;
+                    std::getline(msgStream, text);
+                    std::time_t ts = std::stoll(tsStr);
+                    std::tm *tm_info = std::localtime(&ts);
+                    char buffer[80];
+                    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm_info);
+                    std::cout << "Время: " << buffer << " " << from << " -> " << to << ": " << text << std::endl;
                 }
             }
         }
@@ -191,6 +199,15 @@ namespace NetApp
             if (!errorMsg.empty())
             {
                 std::cerr << "Ошибка: " << errorMsg << std::endl;
+            }
+        }
+        else if (command == "OK")
+        {
+            std::string msg;
+            std::getline(iss, msg);
+            if (!msg.empty())
+            {
+                std::cout << "Успех: " << msg << std::endl;
             }
         }
         else

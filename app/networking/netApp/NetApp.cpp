@@ -165,9 +165,9 @@ namespace NetApp
             if (usersByLogin_.count(login) && usersByLogin_[login]->getPassword() == password)
             {
                 clientToUser_[clientSocket] = login;
-                return "LOGIN_OK " + login;
+                return "LOGIN_OK\n" + login;
             }
-            return "ERROR Invalid login or password";
+            return "ERROR\nInvalid login or password";
         }
         else if (command == "SIGNUP")
         {
@@ -175,7 +175,7 @@ namespace NetApp
             iss >> login >> password >> name;
             if (usersByLogin_.count(login) || usersByName_.count(name))
             {
-                return "ERROR User already exists";
+                return "ERROR\nUser already exists";
             }
             auto user = std::make_shared<ChatApp::User>(login, password, name);
             usersByLogin_[login] = user;
@@ -184,10 +184,12 @@ namespace NetApp
         }
         else if (command == "GET_CHAT")
         {
-            std::string response = "CHAT_MESSAGES ";
+            std::string response = "CHAT_MESSAGES\n";
             for (const auto &msg : messages_)
             {
-                response += msg.getFrom() + " -> " + msg.getTo() + ": " + msg.getText() + "\n";
+                auto timestamp = std::chrono::system_clock::to_time_t(msg.getTimestamp());
+                response += std::to_string(timestamp) + " " + msg.getFrom() + " " +
+                            msg.getTo() + " " + msg.getText() + "\n";
             }
             return response;
         }
@@ -197,23 +199,23 @@ namespace NetApp
             iss >> recipient;
             std::getline(iss, text);
             if (clientToUser_.count(clientSocket) == 0)
-                return "ERROR Not logged in";
+                return "ERROR\nNot logged in";
             if (recipient != "всем" && usersByName_.count(recipient) == 0)
-                return "ERROR Recipient not found";
+                return "ERROR\nRecipient not found";
             std::string sender = clientToUser_[clientSocket];
             messages_.emplace_back(sender, recipient, text);
-            return "OK Message sent";
+            return "OK\nMessage sent";
         }
         else if (command == "GET_USERS")
         {
-            std::string response = "USER_LIST ";
+            std::string response = "USER_LIST\n";
             for (const auto &pair : usersByName_)
             {
                 response += pair.first + "\n";
             }
             return response;
         }
-        return "ERROR Unknown command";
+        return "ERROR\nUnknown command";
     }
 
     void Server::handleDisconnect(SocketType clientSocket)
