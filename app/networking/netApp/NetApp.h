@@ -27,7 +27,7 @@ const SocketType INVALID_SOCKET_VALUE = -1;
 const int SOCKET_ERROR_VALUE = -1;
 #endif
 
-namespace Networking
+namespace NetApp
 {
     class Server
     {

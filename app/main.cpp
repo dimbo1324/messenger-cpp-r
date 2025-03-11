@@ -7,14 +7,12 @@ int main()
 #if defined(_WIN32)
     initConsoleOutput();
 #endif
-
     std::cout << "OS Info: " << getOSInfo() << std::endl;
     std::cout << getProcessInfo() << std::endl;
 
     try
     {
-        ChatApp::Chat messenger;
-        messenger.LoaderMethod();
+        ChatApp::Chat messenger("127.0.0.1", 8080);
         messenger.Start();
 
         while (messenger.ChatIsActive())
@@ -25,7 +23,6 @@ int main()
                 messenger.displayUserMenu();
             }
         }
-        messenger.DataSaver();
     }
     catch (const std::exception &ex)
     {

@@ -3,10 +3,11 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <map>
 #include "SocketHandler.h"
 #include "NetworkInitializer.h"
 
-namespace Networking
+namespace NetApp
 {
 
     class Server
@@ -29,6 +30,8 @@ namespace Networking
         SocketType serverSocket_;
         std::atomic<bool> running_;
         std::vector<std::thread> clientThreads_;
+        std::unordered_map<Networking::SocketType, std::string> clientToUser_;
+
 
         NetworkInitializer netInit_;
     };

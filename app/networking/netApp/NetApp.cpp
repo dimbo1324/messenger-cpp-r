@@ -8,7 +8,7 @@
 #pragma comment(lib, "ws2_32.lib")
 #endif
 
-namespace Networking
+namespace NetApp
 {
 
 #if defined(_WIN32)

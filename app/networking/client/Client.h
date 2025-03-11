@@ -5,7 +5,7 @@
 #include "SocketHandler.h"
 #include "NetworkInitializer.h"
 
-namespace Networking
+namespace NetApp
 {
 
     class Client
@@ -23,6 +23,7 @@ namespace Networking
 
     private:
         void receiveLoop();
+        void handleServerResponse(const std::string &response);
 
         std::string serverAddress_;
         unsigned short serverPort_;

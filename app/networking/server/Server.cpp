@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #endif
 
-namespace Networking
+namespace NetApp
 {
 
     Server::Server(unsigned short port)
