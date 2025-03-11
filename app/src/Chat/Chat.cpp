@@ -8,10 +8,7 @@ namespace ChatApp
     Chat::Chat(const std::string &serverAddress, unsigned short serverPort)
         : client_(serverAddress, serverPort, this)
     {
-        if (!client_.connectToServer())
-        {
-            throw std::runtime_error("Не удалось подключиться к серверу");
-        }
+        client_.connectToServer();
         client_.startReceiving();
     }
 
@@ -22,15 +19,27 @@ namespace ChatApp
 
     void Chat::login()
     {
+        if (_currentUser != nullptr)
+        {
+            std::cout << "Вы уже вошли в систему.\n";
+            return;
+        }
         std::string login, password;
         std::cout << "Логин: ";
         std::cin >> login;
         std::cout << "Пароль: ";
         std::cin >> password;
         std::string request = "LOGIN " + login + " " + password;
-        if (!client_.sendMessage(request))
+        try
         {
-            std::cerr << "Ошибка отправки запроса на вход\n";
+            if (!client_.sendMessage(request))
+            {
+                std::cerr << "Ошибка отправки запроса на вход\n";
+            }
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Исключение при отправке запроса на вход: " << ex.what() << std::endl;
         }
     }
 
@@ -44,25 +53,46 @@ namespace ChatApp
         std::cout << "Ваше имя: ";
         std::cin >> name;
         std::string request = "SIGNUP " + login + " " + password + " " + name;
-        if (!client_.sendMessage(request))
+        try
         {
-            std::cerr << "Ошибка отправки запроса на регистрацию\n";
+            if (!client_.sendMessage(request))
+            {
+                std::cerr << "Ошибка отправки запроса на регистрацию\n";
+            }
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Исключение при отправке запроса на регистрацию: " << ex.what() << std::endl;
         }
     }
 
     void Chat::displayChat()
     {
-        if (!client_.sendMessage("GET_CHAT"))
+        try
         {
-            std::cerr << "Ошибка запроса чата\n";
+            if (!client_.sendMessage("GET_CHAT"))
+            {
+                std::cerr << "Ошибка запроса чата\n";
+            }
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Исключение при запросе чата: " << ex.what() << std::endl;
         }
     }
 
     void Chat::displayAllUserNames()
     {
-        if (!client_.sendMessage("GET_USERS"))
+        try
         {
-            std::cerr << "Ошибка запроса списка пользователей\n";
+            if (!client_.sendMessage("GET_USERS"))
+            {
+                std::cerr << "Ошибка запроса списка пользователей\n";
+            }
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Исключение при запросе списка пользователей: " << ex.what() << std::endl;
         }
     }
 
@@ -75,9 +105,18 @@ namespace ChatApp
         std::cin.ignore();
         std::getline(std::cin, text);
         std::string request = "SEND " + recipient + " " + text;
-        if (!client_.sendMessage(request))
+        try
         {
-            std::cerr << "Ошибка отправки сообщения\n";
+            if (!client_.sendMessage(request))
+            {
+                std::cerr << "Ошибка отправки сообщения\n";
+                return;
+            }
+            std::cout << "Сообщение отправлено\n";
+        }
+        catch (const std::exception &ex)
+        {
+            std::cerr << "Исключение при отправке сообщения: " << ex.what() << std::endl;
         }
     }
 
@@ -92,14 +131,11 @@ namespace ChatApp
             std::cout << "Выберите опцию: ";
 
             int choice;
-            std::cin >> choice;
-
-            if (std::cin.fail())
+            while (!(std::cin >> choice))
             {
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cout << "Неверный ввод. Попробуйте снова.\n";
-                continue;
+                std::cout << "Неверный ввод. Попробуйте снова: ";
             }
 
             switch (choice)
@@ -131,14 +167,11 @@ namespace ChatApp
             std::cout << "Выберите опцию: ";
 
             int choice;
-            std::cin >> choice;
-
-            if (std::cin.fail())
+            while (!(std::cin >> choice))
             {
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cout << "Неверный ввод. Попробуйте снова.\n";
-                continue;
+                std::cout << "Неверный ввод. Попробуйте снова: ";
             }
 
             switch (choice)

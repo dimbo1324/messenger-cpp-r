@@ -7,6 +7,7 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <stdexcept>
 
 namespace NetApp
 {
@@ -26,8 +27,7 @@ namespace NetApp
         clientSocket_ = socket(AF_INET, SOCK_STREAM, 0);
         if (clientSocket_ == INVALID_SOCKET_VALUE)
         {
-            std::cerr << clientMessages::CLIENT_SOCKET_ERROR << std::endl;
-            return false;
+            throw std::runtime_error(clientMessages::CLIENT_SOCKET_ERROR);
         }
 
         sockaddr_in serverAddr;
@@ -37,24 +37,22 @@ namespace NetApp
 
         if (inet_pton(AF_INET, serverAddress_.c_str(), &serverAddr.sin_addr) <= 0)
         {
-            std::cerr << clientMessages::INVALID_ADDRESS << std::endl;
 #if defined(_WIN32)
             closesocket(clientSocket_);
 #else
             close(clientSocket_);
 #endif
-            return false;
+            throw std::runtime_error(clientMessages::INVALID_ADDRESS);
         }
 
         if (connect(clientSocket_, reinterpret_cast<sockaddr *>(&serverAddr), sizeof(serverAddr)) < 0)
         {
-            std::cerr << clientMessages::CONNECT_ERROR << std::endl;
 #if defined(_WIN32)
             closesocket(clientSocket_);
 #else
             close(clientSocket_);
 #endif
-            return false;
+            throw std::runtime_error(clientMessages::CONNECT_ERROR);
         }
 
         connected_ = true;
@@ -87,12 +85,11 @@ namespace NetApp
     bool Client::sendMessage(const std::string &message)
     {
         if (!connected_)
-            return false;
+            throw std::runtime_error("Нет подключения к серверу");
         int bytesSent = send(clientSocket_, message.c_str(), static_cast<int>(message.size()), 0);
         if (bytesSent == SOCKET_ERROR_VALUE)
         {
-            std::cerr << clientMessages::SEND_ERROR << std::endl;
-            return false;
+            throw std::runtime_error(clientMessages::SEND_ERROR);
         }
         return true;
     }
@@ -129,12 +126,12 @@ namespace NetApp
             else if (bytesReceived == 0)
             {
                 std::cout << "Сервер закрыл соединение\n";
-                break;
+                disconnect();
+                return;
             }
             else
             {
-                std::cerr << "Ошибка получения данных\n";
-                break;
+                throw std::runtime_error("Ошибка получения данных");
             }
         }
         disconnect();
@@ -149,14 +146,17 @@ namespace NetApp
     {
         std::istringstream iss(response);
         std::string command;
-        iss >> command;
+        std::getline(iss, command);
 
         if (command == "LOGIN_OK")
         {
             std::string login;
-            iss >> login;
-            chatPtr_->setCurrentUser(std::make_shared<ChatApp::User>(login, "", ""));
-            std::cout << "Вход успешен для " << login << std::endl;
+            std::getline(iss, login);
+            if (!login.empty())
+            {
+                chatPtr_->setCurrentUser(std::make_shared<ChatApp::User>(login, "", ""));
+                std::cout << "Вход успешен для " << login << std::endl;
+            }
         }
         else if (command == "SIGNUP_OK")
         {
@@ -176,16 +176,22 @@ namespace NetApp
         else if (command == "USER_LIST")
         {
             std::string user;
-            while (iss >> user)
+            while (std::getline(iss, user))
             {
-                std::cout << user << std::endl;
+                if (!user.empty())
+                {
+                    std::cout << user << std::endl;
+                }
             }
         }
         else if (command == "ERROR")
         {
             std::string errorMsg;
             std::getline(iss, errorMsg);
-            std::cerr << "Ошибка: " << errorMsg << std::endl;
+            if (!errorMsg.empty())
+            {
+                std::cerr << "Ошибка: " << errorMsg << std::endl;
+            }
         }
         else
         {

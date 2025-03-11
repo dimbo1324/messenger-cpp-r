@@ -27,6 +27,7 @@ int main()
     catch (const std::exception &ex)
     {
         std::cerr << "Ошибка: " << ex.what() << std::endl;
+        return 1;
     }
     return 0;
 }

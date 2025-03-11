@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstring>
 #include <sstream>
+#include <stdexcept>
 
 #if defined(_WIN32)
 #include <winsock2.h>
@@ -18,8 +19,7 @@ namespace NetApp
             WSADATA wsaData;
             if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
             {
-                std::cerr << "WSAStartup failed\n";
-                exit(1);
+                throw std::runtime_error("WSAStartup failed");
             }
         }
         ~WinsockInitializer()
@@ -44,8 +44,7 @@ namespace NetApp
         serverSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);
         if (serverSocket_ == INVALID_SOCKET_VALUE)
         {
-            std::cerr << "Ошибка создания сокета\n";
-            return false;
+            throw std::runtime_error("Ошибка создания сокета");
         }
 
         sockaddr_in serverAddr;
@@ -56,24 +55,22 @@ namespace NetApp
 
         if (::bind(serverSocket_, reinterpret_cast<sockaddr *>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR_VALUE)
         {
-            std::cerr << "Ошибка привязки сокета\n";
 #if defined(_WIN32)
             ::closesocket(serverSocket_);
 #else
             ::close(serverSocket_);
 #endif
-            return false;
+            throw std::runtime_error("Ошибка привязки сокета");
         }
 
         if (::listen(serverSocket_, SOMAXCONN) == SOCKET_ERROR_VALUE)
         {
-            std::cerr << "Ошибка прослушивания сокета\n";
 #if defined(_WIN32)
             ::closesocket(serverSocket_);
 #else
             ::close(serverSocket_);
 #endif
-            return false;
+            throw std::runtime_error("Ошибка прослушивания сокета");
         }
 
         running_ = true;
@@ -112,8 +109,7 @@ namespace NetApp
             {
                 if (!running_)
                     break;
-                std::cerr << "Ошибка приема клиента\n";
-                continue;
+                throw std::runtime_error("Ошибка приема клиента");
             }
             std::cout << "Новый клиент подключился\n";
             clientThreads_.emplace_back(&Server::handleClient, this, clientSocket);
@@ -131,7 +127,10 @@ namespace NetApp
             {
                 std::string request(buffer);
                 std::string response = processRequest(clientSocket, request);
-                ::send(clientSocket, response.c_str(), response.size(), 0);
+                if (::send(clientSocket, response.c_str(), response.size(), 0) == SOCKET_ERROR_VALUE)
+                {
+                    throw std::runtime_error("Ошибка отправки данных клиенту");
+                }
             }
             else if (bytesReceived == 0)
             {
@@ -141,9 +140,7 @@ namespace NetApp
             }
             else
             {
-                std::cerr << "Ошибка получения данных\n";
-                handleDisconnect(clientSocket);
-                break;
+                throw std::runtime_error("Ошибка получения данных");
             }
         }
 #if defined(_WIN32)
@@ -155,6 +152,8 @@ namespace NetApp
 
     std::string Server::processRequest(SocketType clientSocket, const std::string &request)
     {
+        std::lock_guard<std::mutex> lock(dataMutex_);
+
         std::istringstream iss(request);
         std::string command;
         iss >> command;
@@ -199,6 +198,8 @@ namespace NetApp
             std::getline(iss, text);
             if (clientToUser_.count(clientSocket) == 0)
                 return "ERROR Not logged in";
+            if (recipient != "всем" && usersByName_.count(recipient) == 0)
+                return "ERROR Recipient not found";
             std::string sender = clientToUser_[clientSocket];
             messages_.emplace_back(sender, recipient, text);
             return "OK Message sent";
@@ -217,16 +218,25 @@ namespace NetApp
 
     void Server::handleDisconnect(SocketType clientSocket)
     {
+        std::lock_guard<std::mutex> lock(dataMutex_);
         clientToUser_.erase(clientSocket);
     }
 }
 
 int main()
 {
-    NetApp::Server server(8080);
-    server.start();
-    std::cout << "Нажмите Enter для остановки сервера...\n";
-    std::cin.get();
-    server.stop();
+    try
+    {
+        NetApp::Server server(8080);
+        server.start();
+        std::cout << "Нажмите Enter для остановки сервера...\n";
+        std::cin.get();
+        server.stop();
+    }
+    catch (const std::exception &ex)
+    {
+        std::cerr << "Исключение: " << ex.what() << std::endl;
+        return 1;
+    }
     return 0;
 }
