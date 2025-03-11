@@ -60,6 +60,8 @@
     "*.sqlbook": "sql",
     "*.ndjson": "jsonl",
     "*.dbclient-js": "javascript",
-    "string": "cpp"
+    "string": "cpp",
+    "cstring": "cpp",
+    "iostream": "cpp"
   }
 }
