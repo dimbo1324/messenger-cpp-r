@@ -1,6 +1,6 @@
 #include "Server.h"
 #include "../props.h"
-#include "../utils/networkMessages.h"
+#include "../utils/messages.h"
 
 #include <iostream>
 #include <cstring>
