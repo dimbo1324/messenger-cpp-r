@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <memory>
 #include "../Message/Message.h"
@@ -16,8 +17,8 @@ namespace ChatApp
 
         void login();
         void signUp();
-        void displayChat() const;
-        void displayAllUserNames() const;
+        void displayChat();
+        void displayAllUserNames();
         void addMessage();
 
     public:
@@ -27,24 +28,8 @@ namespace ChatApp
         void Start();
         bool ChatIsActive() const { return _isActive; }
         std::shared_ptr<User> GetCurrentUser() const { return _currentUser; }
+        void setCurrentUser(const std::shared_ptr<User> &user) { _currentUser = user; }
         void displayLoginMenu();
         void displayUserMenu();
-
-        /*
-        TODO:
-      * По мере приближения к окончательной версии следует тщательно обдумать, как использовать эти методы:
-      ? Оставить
-      ? Удалить
-      ? Переместить
-      ? Переписать
-      --------------------------------------------------------------------
-      --------------------------------------------------------------------
-        */
-        void LoaderMethod();
-        void DataSaver() const;
-        /*
-        --------------------------------------------------------------------
-        --------------------------------------------------------------------
-        */
     };
 }

@@ -8,8 +8,7 @@
 #include <unordered_map>
 #include <memory>
 #include <sstream>
-#include <iostream>
-#include <map>
+#include "ChatApp.h"
 
 #if defined(_WIN32)
 #include <winsock2.h>
@@ -37,7 +36,11 @@ namespace NetApp
         std::atomic<bool> running_;
         std::vector<std::thread> clientThreads_;
         std::mutex dataMutex_;
-        std::map<SocketType, std::string> clientToUser_;
+
+        std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByLogin_;
+        std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByName_;
+        std::vector<ChatApp::Message> messages_;
+        std::unordered_map<SocketType, std::string> clientToUser_;
 
     public:
         Server(unsigned short port);
@@ -47,29 +50,8 @@ namespace NetApp
         void acceptClients();
         void handleClient(SocketType clientSocket);
         std::string processRequest(SocketType clientSocket, const std::string &request);
-        void handleDisconnect(SocketType clientSocket);
-        void broadcastMessage(const std::string &message);
-    };
 
-    class Client
-    {
     private:
-        std::string serverAddress_;
-        unsigned short serverPort_;
-        SocketType clientSocket_;
-        std::atomic<bool> connected_;
-        std::atomic<bool> receiving_;
-        std::thread receiveThread_;
-
-    public:
-        Client(const std::string &serverAddress, unsigned short serverPort);
-        ~Client();
-        bool connectToServer();
-        void disconnect();
-        bool sendMessage(const std::string &message);
-        void startReceiving();
-        void stopReceiving();
-        void receiveLoop();
-        bool isConnected() const;
+        void handleDisconnect(SocketType clientSocket);
     };
 }

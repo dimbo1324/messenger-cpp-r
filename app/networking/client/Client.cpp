@@ -1,18 +1,18 @@
 #include "Client.h"
 #include "../props.h"
 #include "../utils/messages.h"
-
+#include "Chat.h"
 #include <iostream>
 #include <cstring>
 #include <chrono>
 #include <thread>
+#include <memory>
 
 namespace NetApp
 {
-
-    Client::Client(const std::string &serverAddress, unsigned short serverPort)
-        : serverAddress_(serverAddress), serverPort_(serverPort),
-          clientSocket_(INVALID_SOCKET_VALUE), connected_(false), receiving_(false)
+    Client::Client(const std::string &serverAddress, unsigned short serverPort, ChatApp::Chat *chat)
+        : serverAddress_(serverAddress), serverPort_(serverPort), clientSocket_(INVALID_SOCKET_VALUE),
+          connected_(false), receiving_(false), chatPtr_(chat)
     {
     }
 
@@ -89,7 +89,7 @@ namespace NetApp
         if (!connected_)
             return false;
         int bytesSent = send(clientSocket_, message.c_str(), static_cast<int>(message.size()), 0);
-        if (bytesSent == SOCKET_ERROR)
+        if (bytesSent == SOCKET_ERROR_VALUE)
         {
             std::cerr << clientMessages::SEND_ERROR << std::endl;
             return false;
@@ -116,44 +116,11 @@ namespace NetApp
 
     void Client::receiveLoop()
     {
-        const int bufferSize = static_cast<int>(BUFFER_SIZE * BUFFER_CELL);
-        char buffer[bufferSize];
+        char buffer[1024];
         while (receiving_ && connected_)
         {
-            std::memset(buffer, 0, bufferSize);
-            int bytesReceived = recv(clientSocket_, buffer, bufferSize - 1, 0);
-            if (bytesReceived > 0)
-            {
-                std::cout << "Получено сообщение: " << buffer << std::endl;
-            }
-            else if (bytesReceived == 0)
-            {
-                std::cout << clientMessages::SERVER_CLOSED << std::endl;
-                break;
-            }
-            else
-            {
-                std::cerr << clientMessages::RECEIVE_ERROR << std::endl;
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        disconnect();
-    }
-
-    bool Client::isConnected() const
-    {
-        return connected_;
-    }
-
-    void Client::receiveLoop()
-    {
-        const int bufferSize = static_cast<int>(BUFFER_SIZE * BUFFER_CELL);
-        char buffer[bufferSize];
-        while (receiving_ && connected_)
-        {
-            std::memset(buffer, 0, bufferSize);
-            int bytesReceived = recv(clientSocket_, buffer, bufferSize - 1, 0);
+            std::memset(buffer, 0, sizeof(buffer));
+            int bytesReceived = ::recv(clientSocket_, buffer, sizeof(buffer) - 1, 0);
             if (bytesReceived > 0)
             {
                 std::string response(buffer);
@@ -161,16 +128,21 @@ namespace NetApp
             }
             else if (bytesReceived == 0)
             {
-                std::cout << clientMessages::SERVER_CLOSED << std::endl;
+                std::cout << "Сервер закрыл соединение\n";
                 break;
             }
             else
             {
-                std::cerr << clientMessages::RECEIVE_ERROR << std::endl;
+                std::cerr << "Ошибка получения данных\n";
                 break;
             }
         }
         disconnect();
+    }
+
+    bool Client::isConnected() const
+    {
+        return connected_;
     }
 
     void Client::handleServerResponse(const std::string &response)
@@ -183,8 +155,8 @@ namespace NetApp
         {
             std::string login;
             iss >> login;
+            chatPtr_->setCurrentUser(std::make_shared<ChatApp::User>(login, "", ""));
             std::cout << "Вход успешен для " << login << std::endl;
-            // Здесь можно обновить _currentUser в Chat, но для этого нужен доступ к Chat
         }
         else if (command == "SIGNUP_OK")
         {
@@ -192,17 +164,22 @@ namespace NetApp
         }
         else if (command == "CHAT_MESSAGES")
         {
-            std::string messages;
-            std::getline(iss, messages);
-            std::cout << "Сообщения:\n"
-                      << messages << std::endl;
+            std::string message;
+            while (std::getline(iss, message))
+            {
+                if (!message.empty())
+                {
+                    std::cout << message << std::endl;
+                }
+            }
         }
         else if (command == "USER_LIST")
         {
-            std::string users;
-            std::getline(iss, users);
-            std::cout << "Пользователи:\n"
-                      << users << std::endl;
+            std::string user;
+            while (iss >> user)
+            {
+                std::cout << user << std::endl;
+            }
         }
         else if (command == "ERROR")
         {
@@ -212,8 +189,7 @@ namespace NetApp
         }
         else
         {
-            std::cout << "Получено: " << response << std::endl;
+            std::cout << "Неизвестный ответ от сервера: " << response << std::endl;
         }
     }
-
 }

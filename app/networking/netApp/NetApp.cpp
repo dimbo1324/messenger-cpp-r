@@ -10,7 +10,6 @@
 
 namespace NetApp
 {
-
 #if defined(_WIN32)
     struct WinsockInitializer
     {
@@ -128,14 +127,24 @@ namespace NetApp
         {
             std::memset(buffer, 0, sizeof(buffer));
             int bytesReceived = ::recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-            if (bytesReceived <= 0)
+            if (bytesReceived > 0)
             {
+                std::string request(buffer);
+                std::string response = processRequest(clientSocket, request);
+                ::send(clientSocket, response.c_str(), response.size(), 0);
+            }
+            else if (bytesReceived == 0)
+            {
+                std::cout << "Клиент отключился\n";
                 handleDisconnect(clientSocket);
                 break;
             }
-            std::string request(buffer);
-            std::string response = processRequest(clientSocket, request);
-            ::send(clientSocket, response.c_str(), response.size(), 0);
+            else
+            {
+                std::cerr << "Ошибка получения данных\n";
+                handleDisconnect(clientSocket);
+                break;
+            }
         }
 #if defined(_WIN32)
         ::closesocket(clientSocket);
@@ -149,160 +158,75 @@ namespace NetApp
         std::istringstream iss(request);
         std::string command;
         iss >> command;
+
         if (command == "LOGIN")
         {
-            return "OK Login successful";
+            std::string login, password;
+            iss >> login >> password;
+            if (usersByLogin_.count(login) && usersByLogin_[login]->getPassword() == password)
+            {
+                clientToUser_[clientSocket] = login;
+                return "LOGIN_OK " + login;
+            }
+            return "ERROR Invalid login or password";
         }
         else if (command == "SIGNUP")
         {
-            return "OK Signup successful";
+            std::string login, password, name;
+            iss >> login >> password >> name;
+            if (usersByLogin_.count(login) || usersByName_.count(name))
+            {
+                return "ERROR User already exists";
+            }
+            auto user = std::make_shared<ChatApp::User>(login, password, name);
+            usersByLogin_[login] = user;
+            usersByName_[name] = user;
+            return "SIGNUP_OK";
+        }
+        else if (command == "GET_CHAT")
+        {
+            std::string response = "CHAT_MESSAGES ";
+            for (const auto &msg : messages_)
+            {
+                response += msg.getFrom() + " -> " + msg.getTo() + ": " + msg.getText() + "\n";
+            }
+            return response;
+        }
+        else if (command == "SEND")
+        {
+            std::string recipient, text;
+            iss >> recipient;
+            std::getline(iss, text);
+            if (clientToUser_.count(clientSocket) == 0)
+                return "ERROR Not logged in";
+            std::string sender = clientToUser_[clientSocket];
+            messages_.emplace_back(sender, recipient, text);
+            return "OK Message sent";
+        }
+        else if (command == "GET_USERS")
+        {
+            std::string response = "USER_LIST ";
+            for (const auto &pair : usersByName_)
+            {
+                response += pair.first + "\n";
+            }
+            return response;
         }
         return "ERROR Unknown command";
     }
 
     void Server::handleDisconnect(SocketType clientSocket)
     {
-        std::lock_guard<std::mutex> lock(dataMutex_);
         clientToUser_.erase(clientSocket);
     }
+}
 
-    void Server::broadcastMessage(const std::string &message)
-    {
-        std::lock_guard<std::mutex> lock(dataMutex_);
-        for (const auto &[socket, user] : clientToUser_)
-        {
-            ::send(socket, message.c_str(), message.size(), 0);
-        }
-    }
-
-    Client::Client(const std::string &serverAddress, unsigned short serverPort)
-        : serverAddress_(serverAddress), serverPort_(serverPort), clientSocket_(INVALID_SOCKET_VALUE), connected_(false), receiving_(false)
-    {
-    }
-
-    Client::~Client()
-    {
-        disconnect();
-    }
-
-    bool Client::connectToServer()
-    {
-        clientSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);
-        if (clientSocket_ == INVALID_SOCKET_VALUE)
-        {
-            std::cerr << "Ошибка создания сокета\n";
-            return false;
-        }
-
-        sockaddr_in serverAddr;
-        std::memset(&serverAddr, 0, sizeof(serverAddr));
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_port = htons(serverPort_);
-        if (inet_pton(AF_INET, serverAddress_.c_str(), &serverAddr.sin_addr) <= 0)
-        {
-            std::cerr << "Некорректный адрес сервера\n";
-#if defined(_WIN32)
-            ::closesocket(clientSocket_);
-#else
-            ::close(clientSocket_);
-#endif
-            return false;
-        }
-
-        if (::connect(clientSocket_, reinterpret_cast<sockaddr *>(&serverAddr), sizeof(serverAddr)) < 0)
-        {
-            std::cerr << "Ошибка подключения к серверу\n";
-#if defined(_WIN32)
-            ::closesocket(clientSocket_);
-#else
-            ::close(clientSocket_);
-#endif
-            return false;
-        }
-
-        connected_ = true;
-        std::cout << "Подключено к серверу\n";
-        return true;
-    }
-
-    void Client::disconnect()
-    {
-        if (connected_)
-        {
-            receiving_ = false;
-            if (receiveThread_.joinable())
-            {
-                receiveThread_.join();
-            }
-#if defined(_WIN32)
-            ::closesocket(clientSocket_);
-#else
-            ::close(clientSocket_);
-#endif
-            connected_ = false;
-            std::cout << "Отключено от сервера\n";
-        }
-    }
-
-    bool Client::sendMessage(const std::string &message)
-    {
-        if (!connected_)
-            return false;
-        int bytesSent = ::send(clientSocket_, message.c_str(), message.size(), 0);
-        if (bytesSent == SOCKET_ERROR_VALUE)
-        {
-            std::cerr << "Ошибка отправки сообщения\n";
-            return false;
-        }
-        return true;
-    }
-
-    void Client::startReceiving()
-    {
-        if (!connected_)
-            return;
-        receiving_ = true;
-        receiveThread_ = std::thread(&Client::receiveLoop, this);
-    }
-
-    void Client::stopReceiving()
-    {
-        receiving_ = false;
-        if (receiveThread_.joinable())
-        {
-            receiveThread_.join();
-        }
-    }
-
-    void Client::receiveLoop()
-    {
-        char buffer[1024];
-        while (receiving_ && connected_)
-        {
-            std::memset(buffer, 0, sizeof(buffer));
-            int bytesReceived = ::recv(clientSocket_, buffer, sizeof(buffer) - 1, 0);
-            if (bytesReceived > 0)
-            {
-                std::string response(buffer);
-                std::cout << "Получено: " << response << "\n";
-            }
-            else if (bytesReceived == 0)
-            {
-                std::cout << "Сервер закрыл соединение\n";
-                break;
-            }
-            else
-            {
-                std::cerr << "Ошибка получения данных\n";
-                break;
-            }
-        }
-        disconnect();
-    }
-
-    bool Client::isConnected() const
-    {
-        return connected_;
-    }
-
+int main()
+{
+    NetApp::Server server(8080);
+    server.start();
+    std::cout << "Нажмите Enter для остановки сервера...\n";
+    std::cin.get();
+    server.stop();
+    return 0;
 }
