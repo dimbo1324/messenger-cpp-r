@@ -1,8 +1,5 @@
-
 CXX = g++
-
 CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./include/PlatformOSInfo -I./app/src
-
 TARGET = Console_chat_by_Dima_Prihodko
 
 SOURCES = \
@@ -16,8 +13,6 @@ SOURCES = \
 	include/PlatformOSInfo/PlatformOSInfo.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)
-
-
 
 all: $(TARGET)
 
@@ -40,7 +35,6 @@ install: $(TARGET)
 uninstall:
 	rm -f /usr/local/bin/$(TARGET)
 	rm -f /home/dimbo/Programs/home_work_1/bin/$(TARGET)
-
 
 help:
 	@echo "Доступные цели:"
