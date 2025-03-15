@@ -4,6 +4,7 @@ SERVER_TARGET = ChatServer
 
 SERVER_SOURCES = \
     app/networking/netApp/NetApp.cpp \
+    app/networking/client/Client.cpp \
     app/src/Chat/Chat.cpp \
     app/src/Chat/utils/Display.cpp \
     app/src/Chat/utils/Input.cpp \
@@ -15,12 +16,16 @@ SERVER_OBJECTS = $(SERVER_SOURCES:.cpp=.o)
 
 server: $(SERVER_TARGET)
 
-$(SERVER_TARGET): $(SERVER_OBJECTS)$(CXX) $(CXXFLAGS) -o $@ $^
+$(SERVER_TARGET): $(SERVER_OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ -lws2_32
 
-%.o: %.cpp$(CXX) $(CXXFLAGS) -c $< -o $@
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-clean:rm -f $(SERVER_OBJECTS) $(SERVER_TARGET)
+clean:
+	rm -f $(SERVER_OBJECTS) $(SERVER_TARGET)
 
-run_server: $(SERVER_TARGET)./$(SERVER_TARGET)
+run_server: $(SERVER_TARGET)
+	./$(SERVER_TARGET)
 
 .PHONY: server clean run_server
