@@ -9,7 +9,6 @@
 #include <thread>
 #include <memory>
 #include <stdexcept>
-
 namespace NetApp
 {
     Client::Client(const std::string &serverAddress, unsigned short serverPort, ChatApp::Chat *chat)
@@ -17,12 +16,10 @@ namespace NetApp
           connected_(false), receiving_(false), chatPtr_(chat)
     {
     }
-
     Client::~Client()
     {
         disconnect();
     }
-
     bool Client::connectToServer()
     {
         clientSocket_ = socket(AF_INET, SOCK_STREAM, 0);
@@ -30,12 +27,10 @@ namespace NetApp
         {
             throw std::runtime_error(clientMessages::CLIENT_SOCKET_ERROR);
         }
-
         sockaddr_in serverAddr;
         std::memset(&serverAddr, 0, sizeof(serverAddr));
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(serverPort_);
-
         if (inet_pton(AF_INET, serverAddress_.c_str(), &serverAddr.sin_addr) <= 0)
         {
 #if defined(_WIN32)
@@ -45,7 +40,6 @@ namespace NetApp
 #endif
             throw std::runtime_error(clientMessages::INVALID_ADDRESS);
         }
-
         if (connect(clientSocket_, reinterpret_cast<sockaddr *>(&serverAddr), sizeof(serverAddr)) < 0)
         {
 #if defined(_WIN32)
@@ -55,14 +49,12 @@ namespace NetApp
 #endif
             throw std::runtime_error(clientMessages::CONNECT_ERROR);
         }
-
         connected_ = true;
         std::cout << clientMessages::CONNECT_SUCCESS
                   << serverAddress_ << ":" << serverPort_
                   << " успешно установлено." << std::endl;
         return true;
     }
-
     void Client::disconnect()
     {
         if (connected_)
@@ -82,7 +74,6 @@ namespace NetApp
             std::cout << clientMessages::DISCONNECT_SUCCESS << std::endl;
         }
     }
-
     bool Client::sendMessage(const std::string &message)
     {
         if (!connected_)
@@ -94,7 +85,6 @@ namespace NetApp
         }
         return true;
     }
-
     void Client::startReceiving()
     {
         if (!connected_)
@@ -102,7 +92,6 @@ namespace NetApp
         receiving_ = true;
         receiveThread_ = std::thread(&Client::receiveLoop, this);
     }
-
     void Client::stopReceiving()
     {
         receiving_ = false;
@@ -111,7 +100,6 @@ namespace NetApp
             receiveThread_.join();
         }
     }
-
     void Client::receiveLoop()
     {
         char buffer[1024];
@@ -137,18 +125,15 @@ namespace NetApp
         }
         disconnect();
     }
-
     bool Client::isConnected() const
     {
         return connected_;
     }
-
     void Client::handleServerResponse(const std::string &response)
     {
         std::istringstream iss(response);
         std::string command;
         std::getline(iss, command);
-
         if (command == "LOGIN_OK")
         {
             std::string login;

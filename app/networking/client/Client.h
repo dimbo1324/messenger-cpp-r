@@ -1,11 +1,9 @@
 #pragma once
-
 #include <string>
 #include <thread>
 #include <atomic>
 #include <memory>
 #include "../chatApp/ChatApp.h"
-
 #if defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -21,7 +19,6 @@ typedef int SocketType;
 const SocketType INVALID_SOCKET_VALUE = -1;
 const int SOCKET_ERROR_VALUE = -1;
 #endif
-
 namespace NetApp
 {
     class Chat;
@@ -35,7 +32,6 @@ namespace NetApp
         std::atomic<bool> receiving_;
         std::thread receiveThread_;
         ChatApp::Chat *chatPtr_;
-
     public:
         Client(const std::string &serverAddress, unsigned short serverPort, ChatApp::Chat *chat);
         ~Client();

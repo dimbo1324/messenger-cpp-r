@@ -7,12 +7,10 @@
 #include <thread>
 #include <memory>
 #include <stdexcept>
-
 #if defined(_WIN32)
 #include <windows.h>
 #include <winsock2.h>
 #endif
-
 namespace NetApp
 {
 #if defined(_WIN32)
@@ -32,17 +30,14 @@ namespace NetApp
         }
     } winsockInit;
 #endif
-
     Server::Server(unsigned short port)
         : port_(port), serverSocket_(INVALID_SOCKET_VALUE), running_(false)
     {
     }
-
     Server::~Server()
     {
         stop();
     }
-
     bool Server::start()
     {
         serverSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -50,13 +45,11 @@ namespace NetApp
         {
             throw std::runtime_error("Ошибка создания сокета");
         }
-
         sockaddr_in serverAddr;
         std::memset(&serverAddr, 0, sizeof(serverAddr));
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(port_);
         serverAddr.sin_addr.s_addr = INADDR_ANY;
-
         if (::bind(serverSocket_, reinterpret_cast<sockaddr *>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR_VALUE)
         {
 #if defined(_WIN32)
@@ -66,7 +59,6 @@ namespace NetApp
 #endif
             throw std::runtime_error("Ошибка привязки сокета");
         }
-
         if (::listen(serverSocket_, SOMAXCONN) == SOCKET_ERROR_VALUE)
         {
 #if defined(_WIN32)
@@ -76,13 +68,11 @@ namespace NetApp
 #endif
             throw std::runtime_error("Ошибка прослушивания сокета");
         }
-
         running_ = true;
         std::cout << "Сервер запущен на порту " << port_ << "\n";
         clientThreads_.emplace_back(&Server::acceptClients, this);
         return true;
     }
-
     void Server::stop()
     {
         if (!running_)
@@ -101,7 +91,6 @@ namespace NetApp
         clientThreads_.clear();
         std::cout << "Сервер остановлен\n";
     }
-
     void Server::acceptClients()
     {
         while (running_)
@@ -119,7 +108,6 @@ namespace NetApp
             clientThreads_.emplace_back(&Server::handleClient, this, clientSocket);
         }
     }
-
     void Server::handleClient(SocketType clientSocket)
     {
         char buffer[1024];
@@ -153,15 +141,12 @@ namespace NetApp
         ::close(clientSocket);
 #endif
     }
-
     std::string Server::processRequest(SocketType clientSocket, const std::string &request)
     {
         std::lock_guard<std::mutex> lock(dataMutex_);
-
         std::istringstream iss(request);
         std::string command;
         iss >> command;
-
         if (command == "LOGIN")
         {
             std::string login, password;
@@ -221,20 +206,17 @@ namespace NetApp
         }
         return "ERROR\nUnknown command";
     }
-
     void Server::handleDisconnect(SocketType clientSocket)
     {
         std::lock_guard<std::mutex> lock(dataMutex_);
         clientToUser_.erase(clientSocket);
     }
 }
-
 int main()
 {
 #if defined(_WIN32)
     SetConsoleOutputCP(65001);
 #endif
-
     try
     {
         NetApp::Server server(8080);

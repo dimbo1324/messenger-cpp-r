@@ -2,7 +2,6 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
-
 namespace ChatApp
 {
     namespace TimeUtils

@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <chrono>
-
 namespace ChatApp
 {
     namespace TimeUtils

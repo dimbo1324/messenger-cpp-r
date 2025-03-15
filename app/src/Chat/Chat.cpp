@@ -2,7 +2,6 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
-
 namespace ChatApp
 {
     Chat::Chat(const std::string &serverAddress, unsigned short serverPort)
@@ -11,12 +10,10 @@ namespace ChatApp
         client_.connectToServer();
         client_.startReceiving();
     }
-
     void Chat::Start()
     {
         _isActive = true;
     }
-
     void Chat::login()
     {
         if (_currentUser != nullptr)
@@ -42,7 +39,6 @@ namespace ChatApp
             std::cerr << "Исключение при отправке запроса на вход: " << ex.what() << std::endl;
         }
     }
-
     void Chat::signUp()
     {
         std::string login, password, name;
@@ -65,7 +61,6 @@ namespace ChatApp
             std::cerr << "Исключение при отправке запроса на регистрацию: " << ex.what() << std::endl;
         }
     }
-
     void Chat::displayChat()
     {
         try
@@ -80,7 +75,6 @@ namespace ChatApp
             std::cerr << "Исключение при запросе чата: " << ex.what() << std::endl;
         }
     }
-
     void Chat::displayAllUserNames()
     {
         try
@@ -95,7 +89,6 @@ namespace ChatApp
             std::cerr << "Исключение при запросе списка пользователей: " << ex.what() << std::endl;
         }
     }
-
     void Chat::addMessage()
     {
         std::string recipient, text;
@@ -119,7 +112,6 @@ namespace ChatApp
             std::cerr << "Исключение при отправке сообщения: " << ex.what() << std::endl;
         }
     }
-
     void Chat::displayLoginMenu()
     {
         while (_currentUser == nullptr && _isActive)
@@ -129,7 +121,6 @@ namespace ChatApp
             std::cout << "2. Регистрация\n";
             std::cout << "3. Выход\n";
             std::cout << "Выберите опцию: ";
-
             int choice;
             while (!(std::cin >> choice))
             {
@@ -137,7 +128,6 @@ namespace ChatApp
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
                 std::cout << "Неверный ввод. Попробуйте снова: ";
             }
-
             switch (choice)
             {
             case 1:
@@ -155,7 +145,6 @@ namespace ChatApp
             }
         }
     }
-
     void Chat::displayUserMenu()
     {
         while (_isActive && _currentUser != nullptr)
@@ -165,7 +154,6 @@ namespace ChatApp
             std::cout << "2. Отправить сообщение\n";
             std::cout << "3. Выход\n";
             std::cout << "Выберите опцию: ";
-
             int choice;
             while (!(std::cin >> choice))
             {
@@ -173,7 +161,6 @@ namespace ChatApp
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
                 std::cout << "Неверный ввод. Попробуйте снова: ";
             }
-
             switch (choice)
             {
             case 1:

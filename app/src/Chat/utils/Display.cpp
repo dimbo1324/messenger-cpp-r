@@ -2,7 +2,6 @@
 #include <iostream>
 #include <iomanip>
 #include <ctime>
-
 namespace ChatApp
 {
     namespace DisplayUtils
@@ -18,7 +17,6 @@ namespace ChatApp
                 std::cout << "\n---------------------\n";
             }
         }
-
         void PrintMessage(const std::string &from, const std::string &to,
                           const std::string &text, const std::string &timestamp)
         {

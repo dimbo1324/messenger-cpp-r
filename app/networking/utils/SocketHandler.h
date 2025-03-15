@@ -1,6 +1,5 @@
 #pragma once
 #include <stdexcept>
-
 #if defined(_WIN32)
 #include <winsock2.h>
 typedef SOCKET SocketType;
@@ -14,7 +13,6 @@ typedef int SocketType;
 #define INVALID_SOCKET_VALUE (-1)
 #define SOCKET_ERROR (-1)
 #endif
-
 class SocketHandler
 {
 public:
@@ -38,7 +36,6 @@ public:
             socket_ = INVALID_SOCKET_VALUE;
         }
     }
-
 private:
     SocketType socket_;
 };

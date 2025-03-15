@@ -1,6 +1,5 @@
 #include <limits>
 #include "Input.h"
-
 namespace ChatApp
 {
     namespace InputUtils
@@ -12,7 +11,6 @@ namespace ChatApp
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             return option;
         }
-
         std::string ReadLine()
         {
             std::string line;

@@ -1,5 +1,4 @@
 #pragma once
-
 #include <string>
 #include <vector>
 #include <thread>
@@ -9,7 +8,6 @@
 #include <memory>
 #include <sstream>
 #include "../chatApp/ChatApp.h"
-
 #if defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -25,7 +23,6 @@ typedef int SocketType;
 const SocketType INVALID_SOCKET_VALUE = -1;
 const int SOCKET_ERROR_VALUE = -1;
 #endif
-
 namespace NetApp
 {
     class Server
@@ -36,12 +33,10 @@ namespace NetApp
         std::atomic<bool> running_;
         std::vector<std::thread> clientThreads_;
         std::mutex dataMutex_;
-
         std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByLogin_;
         std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByName_;
         std::vector<ChatApp::Message> messages_;
         std::unordered_map<SocketType, std::string> clientToUser_;
-
     public:
         Server(unsigned short port);
         ~Server();
@@ -50,7 +45,6 @@ namespace NetApp
         void acceptClients();
         void handleClient(SocketType clientSocket);
         std::string processRequest(SocketType clientSocket, const std::string &request);
-
     private:
         void handleDisconnect(SocketType clientSocket);
     };

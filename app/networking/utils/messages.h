@@ -1,5 +1,4 @@
 #pragma once
-
 namespace serverMessages
 {
     constexpr const char *WSASTARTUP_ERROR = "WSAStartup не удалась: ";
@@ -14,7 +13,6 @@ namespace serverMessages
     constexpr const char *RECEIVE_ERROR = "Ошибка приема данных от клиента.";
     constexpr const char *SERVER_STOPPED = "Сервер остановлен.";
 }
-
 namespace clientMessages
 {
     constexpr const char *WSASTARTUP_ERROR = "WSAStartup не удалась: ";

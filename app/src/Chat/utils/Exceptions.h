@@ -1,6 +1,5 @@
 #pragma once
 #include <exception>
-
 namespace ChatApp
 {
     class UserLoginException : public std::exception
@@ -11,7 +10,6 @@ namespace ChatApp
             return "Ошибка: логин пользователя занят.";
         }
     };
-
     class UserNameException : public std::exception
     {
     public:
