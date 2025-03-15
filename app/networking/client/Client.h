@@ -4,7 +4,7 @@
 #include <thread>
 #include <atomic>
 #include <memory>
-#include "Chat.h"
+#include "../chatApp/ChatApp.h"
 
 #if defined(_WIN32)
 #include <winsock2.h>

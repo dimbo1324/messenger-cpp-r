@@ -15,16 +15,12 @@ SERVER_OBJECTS = $(SERVER_SOURCES:.cpp=.o)
 
 server: $(SERVER_TARGET)
 
-$(SERVER_TARGET): $(SERVER_OBJECTS)
-    $(CXX) $(CXXFLAGS) -o $@ $^
+$(SERVER_TARGET): $(SERVER_OBJECTS)$(CXX) $(CXXFLAGS) -o $@ $^
 
-%.o: %.cpp
-    $(CXX) $(CXXFLAGS) -c $< -o $@
+%.o: %.cpp$(CXX) $(CXXFLAGS) -c $< -o $@
 
-clean:
-    rm -f $(SERVER_OBJECTS) $(SERVER_TARGET)
+clean:rm -f $(SERVER_OBJECTS) $(SERVER_TARGET)
 
-run_server: $(SERVER_TARGET)
-    ./$(SERVER_TARGET)
+run_server: $(SERVER_TARGET)./$(SERVER_TARGET)
 
 .PHONY: server clean run_server

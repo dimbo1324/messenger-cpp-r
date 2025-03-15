@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <memory>
 #include <sstream>
-#include "ChatApp.h"
+#include "../chatApp/ChatApp.h"
 
 #if defined(_WIN32)
 #include <winsock2.h>
