@@ -8,8 +8,8 @@
 #include <memory>
 #include <stdexcept>
 
-
 #if defined(_WIN32)
+#include <windows.h>
 #include <winsock2.h>
 #endif
 
@@ -231,6 +231,10 @@ namespace NetApp
 
 int main()
 {
+#if defined(_WIN32)
+    SetConsoleOutputCP(65001);
+#endif
+
     try
     {
         NetApp::Server server(8080);

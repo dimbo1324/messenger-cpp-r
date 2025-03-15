@@ -2,11 +2,16 @@
 #include "src/Chat/Chat.h"
 #include "PlatformOSInfo/PlatformOSInfo.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 int main()
 {
 #if defined(_WIN32)
-    initConsoleOutput();
+    SetConsoleOutputCP(65001);
 #endif
+
     std::cout << "OS Info: " << getOSInfo() << std::endl;
     std::cout << getProcessInfo() << std::endl;
 
