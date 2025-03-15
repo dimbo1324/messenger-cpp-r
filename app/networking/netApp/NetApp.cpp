@@ -1,12 +1,16 @@
 #include "NetApp.h"
+#include "../../app/src/User/User.h"
+#include "../../app/src/Message/Message.h"
 #include <iostream>
 #include <cstring>
-#include <sstream>
+#include <chrono>
+#include <thread>
+#include <memory>
 #include <stdexcept>
+
 
 #if defined(_WIN32)
 #include <winsock2.h>
-#pragma comment(lib, "ws2_32.lib")
 #endif
 
 namespace NetApp
@@ -162,7 +166,7 @@ namespace NetApp
         {
             std::string login, password;
             iss >> login >> password;
-            if (usersByLogin_.count(login) && usersByLogin_[login]->getPassword() == password)
+            if (usersByLogin_.count(login) && usersByLogin_[login]->GetUserPassword() == password)
             {
                 clientToUser_[clientSocket] = login;
                 return "LOGIN_OK\n" + login;
@@ -187,9 +191,9 @@ namespace NetApp
             std::string response = "CHAT_MESSAGES\n";
             for (const auto &msg : messages_)
             {
-                auto timestamp = std::chrono::system_clock::to_time_t(msg.getTimestamp());
-                response += std::to_string(timestamp) + " " + msg.getFrom() + " " +
-                            msg.getTo() + " " + msg.getText() + "\n";
+                auto timestamp = std::chrono::system_clock::to_time_t(msg.GetTimestamp());
+                response += std::to_string(timestamp) + " " + msg.GetFrom() + " " +
+                            msg.GetTo() + " " + msg.GetText() + "\n";
             }
             return response;
         }

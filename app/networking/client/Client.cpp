@@ -1,7 +1,8 @@
 #include "Client.h"
 #include "../props.h"
 #include "../utils/messages.h"
-#include "Chat.h"
+#include "../../app/src/Chat/Chat.h"
+#include "../../app/src/User/User.h"
 #include <iostream>
 #include <cstring>
 #include <chrono>
