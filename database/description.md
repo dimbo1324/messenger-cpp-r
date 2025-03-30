@@ -1,9 +1,4 @@
 <!-- 
-TODO: Ссылка на ТЗ (Database for console chat's project): 
-* https://docs.google.com/document/d/1gSBqZ10cYyHCSCBy8xABeF39an_JUxmv0StW5y-0UvE/edit?usp=sharing 
--->
-
-<!-- 
 Техническое задание на разработку базы данных проекта «Чат»
 1. Общие положения
 База данных должна обеспечивать:
