@@ -182,3 +182,303 @@ new_data
 Эта архитектура соответствует мировым стандартам 2025 года и готова к расширению в будущем (например, для поддержки групповых чатов, ролей пользователей, дополнительных типов сообщений и вложений), обеспечивая надежную, масштабируемую и безопасную систему для работы с данными проекта чата.
 Разработка должна учитывать возможность внедрения дополнительных проверок (например, CHECK-констрейнтов для полей status и message_type), а также предусмотреть индексацию наиболее часто используемых полей для повышения производительности системы. 
 -->
+
+create extension if not exists pgcrypto;
+
+create table users
+(
+    user_id       serial primary key,
+    username      varchar(50) unique  not null,
+    email         varchar(100) unique not null,
+    password_hash varchar(255)        not null,
+    created_at    timestamp default current_timestamp,
+    updated_at    timestamp default current_timestamp,
+    is_deleted    boolean   default false
+);
+
+create table user_profiles
+(
+    user_id    int primary key,
+    first_name varchar(50),
+    last_name  varchar(50),
+    language   varchar(10) not null,
+    timezone   varchar(50) not null,
+    avatar_url varchar(255),
+    bio        text,
+    constraint fk_user_profile foreign key (user_id) references users (user_id) on delete cascade
+);
+
+create table conversations
+(
+    conversation_id serial primary key,
+    title           varchar(100),
+    is_group        boolean   default false,
+    created_at      timestamp default current_timestamp,
+    updated_at      timestamp default current_timestamp
+);
+
+create table conversation_participants
+(
+    conversation_id int not null,
+    user_id         int not null,
+    role            varchar(20) default 'member',
+    joined_at       timestamp   default current_timestamp,
+    primary key (conversation_id, user_id),
+    constraint fk_conversation foreign key (conversation_id) references conversations (conversation_id) on delete cascade,
+    constraint fk_participant foreign key (user_id) references users (user_id) on delete cascade,
+    constraint check_role check (role in ('member', 'admin'))
+);
+
+create type message_status as enum ('sent', 'delivered', 'read');
+
+create table messages
+(
+    message_id      serial primary key,
+    conversation_id int            not null,
+    sender_id       int            not null,
+    text            text           not null,
+    message_type    varchar(20)    not null,
+    sent_at         timestamp               default current_timestamp,
+    status          message_status not null default 'sent',
+    constraint fk_message_conversation foreign key (conversation_id) references conversations (conversation_id) on delete cascade,
+    constraint fk_message_sender foreign key (sender_id) references users (user_id) on delete cascade
+);
+
+create table message_attachments
+(
+    attachment_id serial primary key,
+    message_id    int          not null,
+    file_path     varchar(255) not null,
+    file_type     varchar(50)  not null,
+    constraint fk_attachment_message foreign key (message_id) references messages (message_id) on delete cascade
+);
+
+create table read_receipts
+(
+    message_id int not null,
+    user_id    int not null,
+    read_at    timestamp default current_timestamp,
+    primary key (message_id, user_id),
+    constraint fk_receipt_message foreign key (message_id) references messages (message_id) on delete cascade,
+    constraint fk_receipt_user foreign key (user_id) references users (user_id) on delete cascade
+);
+
+create table message_reactions
+(
+    reaction_id serial primary key,
+    message_id  int         not null,
+    user_id     int         not null,
+    reaction    varchar(50) not null,
+    reacted_at  timestamp default current_timestamp,
+    constraint fk_reaction_message foreign key (message_id) references messages (message_id) on delete cascade,
+    constraint fk_reaction_user foreign key (user_id) references users (user_id) on delete cascade
+);
+
+create table audit_log
+(
+    log_id     serial primary key,
+    table_name varchar(50) not null,
+    record_id  text,
+    action     varchar(20) not null,
+    changed_at timestamp default current_timestamp,
+    changed_by int,
+    old_data   json,
+    new_data   json,
+    constraint fk_audit_changed_by foreign key (changed_by) references users (user_id) on delete set null
+);
+
+create or replace function update_updated_at()
+    returns trigger as
+$$
+begin
+    new.updated_at = current_timestamp;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger update_users_updated_at
+    before update
+    on users
+    for each row
+execute function update_updated_at();
+
+create trigger update_conversations_updated_at
+    before update
+    on conversations
+    for each row
+execute function update_updated_at();
+
+create trigger update_messages_updated_at
+    before update
+    on messages
+    for each row
+execute function update_updated_at();
+
+create trigger update_message_attachments_updated_at
+    before update
+    on message_attachments
+    for each row
+execute function update_updated_at();
+
+create or replace procedure create_user(
+    p_username varchar(50),
+    p_email varchar(100),
+    p_password_hash varchar(255),
+    p_first_name varchar(50),
+    p_last_name varchar(50),
+    p_language varchar(10),
+    p_timezone varchar(50)
+)
+    language plpgsql
+as
+$$
+declare
+    v_user_id int;
+begin
+    insert into users (username, email, password_hash)
+    values (p_username, p_email, p_password_hash)
+    returning user_id into v_user_id;
+
+    insert into user_profiles (user_id, first_name, last_name, language, timezone)
+    values (v_user_id, p_first_name, p_last_name, p_language, p_timezone);
+end;
+$$;
+
+create or replace function log_audit()
+    returns trigger as
+$$
+declare
+    pk_value       text;
+    changed_by_val int  := null;
+    col_pk         text := tg_argv[0];
+    col_changed_by text := null;
+begin
+    if array_length(tg_argv, 1) >= 2 then
+        col_changed_by := tg_argv[1];
+    end if;
+
+    if tg_op = 'DELETE' then
+        execute format('select ($1).' || quote_ident(col_pk) || '::text') into pk_value using old;
+        if col_changed_by is not null then
+            execute format('select ($1).' || quote_ident(col_changed_by) || '::int') into changed_by_val using old;
+        end if;
+    else
+        execute format('select ($1).' || quote_ident(col_pk) || '::text') into pk_value using new;
+        if col_changed_by is not null then
+            execute format('select ($1).' || quote_ident(col_changed_by) || '::int') into changed_by_val using new;
+        end if;
+    end if;
+
+    if tg_op = 'INSERT' then
+        insert into audit_log (table_name, record_id, action, changed_at, changed_by, new_data)
+        values (tg_table_name, pk_value, tg_op, current_timestamp, changed_by_val, row_to_json(new));
+    elsif tg_op = 'UPDATE' then
+        insert into audit_log (table_name, record_id, action, changed_at, changed_by, old_data, new_data)
+        values (tg_table_name, pk_value, tg_op, current_timestamp, changed_by_val, row_to_json(old), row_to_json(new));
+    elsif tg_op = 'DELETE' then
+        insert into audit_log (table_name, record_id, action, changed_at, changed_by, old_data)
+        values (tg_table_name, pk_value, tg_op, current_timestamp, changed_by_val, row_to_json(old));
+    end if;
+    return null;
+end;
+$$ language plpgsql;
+
+create or replace function log_audit_composite()
+    returns trigger as
+$$
+declare
+    pk_value       text;
+    changed_by_val int;
+begin
+    if tg_op = 'DELETE' then
+        pk_value := old.conversation_id::text || '-' || old.user_id::text;
+        changed_by_val := old.user_id;
+    else
+        pk_value := new.conversation_id::text || '-' || new.user_id::text;
+        changed_by_val := new.user_id;
+    end if;
+
+    if tg_op = 'INSERT' then
+        insert into audit_log (table_name, record_id, action, changed_at, changed_by, new_data)
+        values (tg_table_name, pk_value, tg_op, current_timestamp, changed_by_val, row_to_json(new));
+    elsif tg_op = 'UPDATE' then
+        insert into audit_log (table_name, record_id, action, changed_at, changed_by, old_data, new_data)
+        values (tg_table_name, pk_value, tg_op, current_timestamp, changed_by_val, row_to_json(old), row_to_json(new));
+    elsif tg_op = 'DELETE' then
+        insert into audit_log (table_name, record_id, action, changed_at, changed_by, old_data)
+        values (tg_table_name, pk_value, tg_op, current_timestamp, changed_by_val, row_to_json(old));
+    end if;
+    return null;
+end;
+$$ language plpgsql;
+
+create trigger audit_users
+    after insert or update or delete
+    on users
+    for each row
+execute function log_audit('user_id', 'user_id');
+
+create trigger audit_user_profiles
+    after insert or update or delete
+    on user_profiles
+    for each row
+execute function log_audit('user_id');
+
+create trigger audit_conversations
+    after insert or update or delete
+    on conversations
+    for each row
+execute function log_audit('conversation_id');
+
+create trigger audit_messages
+    after insert or update or delete
+    on messages
+    for each row
+execute function log_audit('message_id', 'sender_id');
+
+create trigger audit_message_attachments
+    after insert or update or delete
+    on message_attachments
+    for each row
+execute function log_audit('attachment_id');
+
+create trigger audit_message_reactions
+    after insert or update or delete
+    on message_reactions
+    for each row
+execute function log_audit('reaction_id');
+
+create trigger audit_conversation_participants
+    after insert or update or delete
+    on conversation_participants
+    for each row
+execute function log_audit_composite();
+
+create index idx_messages_conversation_id on messages (conversation_id);
+create index idx_conversation_participants_user_id on conversation_participants (user_id);
+create index idx_read_receipts_message_id on read_receipts (message_id);
+create index idx_messages_sender_id on messages (sender_id);
+create index idx_messages_sent_at on messages (sent_at);
+
+create or replace function soft_delete_user()
+    returns trigger as
+$$
+begin
+    if new.is_deleted = true and old.is_deleted = false then
+        update conversation_participants set joined_at = null where user_id = new.user_id;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trigger_soft_delete_user
+    before update
+    on users
+    for each row
+execute function soft_delete_user();
+
+create role user_role;
+grant select, insert, update on users, messages to user_role;
+
+create role admin_role;
+grant all privileges on all tables in schema public to admin_role;
