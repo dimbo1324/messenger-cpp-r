@@ -4,7 +4,7 @@
 #include <memory>
 namespace ChatApp
 {
-    class Chat;
-    class User;
-    class Message;
+class Chat;
+class User;
+class Message;
 }

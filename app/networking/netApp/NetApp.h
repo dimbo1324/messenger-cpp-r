@@ -25,27 +25,27 @@ const int SOCKET_ERROR_VALUE = -1;
 #endif
 namespace NetApp
 {
-    class Server
-    {
-    private:
-        unsigned short port_;
-        SocketType serverSocket_;
-        std::atomic<bool> running_;
-        std::vector<std::thread> clientThreads_;
-        std::mutex dataMutex_;
-        std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByLogin_;
-        std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByName_;
-        std::vector<ChatApp::Message> messages_;
-        std::unordered_map<SocketType, std::string> clientToUser_;
-    public:
-        Server(unsigned short port);
-        ~Server();
-        bool start();
-        void stop();
-        void acceptClients();
-        void handleClient(SocketType clientSocket);
-        std::string processRequest(SocketType clientSocket, const std::string &request);
-    private:
-        void handleDisconnect(SocketType clientSocket);
-    };
+class Server
+{
+private:
+unsigned short port_;
+SocketType serverSocket_;
+std::atomic<bool> running_;
+std::vector<std::thread> clientThreads_;
+std::mutex dataMutex_;
+std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByLogin_;
+std::unordered_map<std::string, std::shared_ptr<ChatApp::User>> usersByName_;
+std::vector<ChatApp::Message> messages_;
+std::unordered_map<SocketType, std::string> clientToUser_;
+public:
+Server(unsigned short port);
+~Server();
+bool start();
+void stop();
+void acceptClients();
+void handleClient(SocketType clientSocket);
+std::string processRequest(SocketType clientSocket, const std::string &request);
+private:
+void handleDisconnect(SocketType clientSocket);
+};
 }

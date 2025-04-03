@@ -7,27 +7,27 @@
 int main()
 {
 #if defined(_WIN32)
-    SetConsoleOutputCP(65001);
+SetConsoleOutputCP(65001);
 #endif
-    std::cout << "OS Info: " << getOSInfo() << std::endl;
-    std::cout << getProcessInfo() << std::endl;
-    try
-    {
-        ChatApp::Chat messenger("127.0.0.1", 8080);
-        messenger.Start();
-        while (messenger.ChatIsActive())
-        {
-            messenger.displayLoginMenu();
-            while (messenger.GetCurrentUser())
-            {
-                messenger.displayUserMenu();
-            }
-        }
-    }
-    catch (const std::exception &ex)
-    {
-        std::cerr << "Ошибка: " << ex.what() << std::endl;
-        return 1;
-    }
-    return 0;
+std::cout << "OS Info: " << getOSInfo() << std::endl;
+std::cout << getProcessInfo() << std::endl;
+try
+{
+ChatApp::Chat messenger("127.0.0.1", 8080);
+messenger.Start();
+while (messenger.ChatIsActive())
+{
+messenger.displayLoginMenu();
+while (messenger.GetCurrentUser())
+{
+messenger.displayUserMenu();
+}
+}
+}
+catch (const std::exception &ex)
+{
+std::cerr << "Ошибка: " << ex.what() << std::endl;
+return 1;
+}
+return 0;
 }

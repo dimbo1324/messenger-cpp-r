@@ -16,26 +16,26 @@ typedef int SocketType;
 class SocketHandler
 {
 public:
-    explicit SocketHandler(SocketType sock = INVALID_SOCKET_VALUE) : socket_(sock) {}
-    ~SocketHandler() { closeSocket(); }
-    SocketType get() const { return socket_; }
-    void reset(SocketType sock = INVALID_SOCKET_VALUE)
-    {
-        closeSocket();
-        socket_ = sock;
-    }
-    void closeSocket()
-    {
-        if (socket_ != INVALID_SOCKET_VALUE)
-        {
+explicit SocketHandler(SocketType sock = INVALID_SOCKET_VALUE) : socket_(sock) {}
+~SocketHandler() { closeSocket(); }
+SocketType get() const { return socket_; }
+void reset(SocketType sock = INVALID_SOCKET_VALUE)
+{
+closeSocket();
+socket_ = sock;
+}
+void closeSocket()
+{
+if (socket_ != INVALID_SOCKET_VALUE)
+{
 #if defined(_WIN32)
-            closesocket(socket_);
+closesocket(socket_);
 #else
-            close(socket_);
+close(socket_);
 #endif
-            socket_ = INVALID_SOCKET_VALUE;
-        }
-    }
+socket_ = INVALID_SOCKET_VALUE;
+}
+}
 private:
-    SocketType socket_;
+SocketType socket_;
 };

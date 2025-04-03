@@ -7,21 +7,21 @@
 class NetworkInitializer
 {
 public:
-    NetworkInitializer()
-    {
+NetworkInitializer()
+{
 #if defined(_WIN32)
-        WSADATA wsaData;
-        int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if (result != 0)
-        {
-            throw std::runtime_error("WSAStartup failed with error: " + std::to_string(result));
-        }
+WSADATA wsaData;
+int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+if (result != 0)
+{
+throw std::runtime_error("WSAStartup failed with error: " + std::to_string(result));
+}
 #endif
-    }
-    ~NetworkInitializer()
-    {
+}
+~NetworkInitializer()
+{
 #if defined(_WIN32)
-        WSACleanup();
+WSACleanup();
 #endif
-    }
+}
 };
