@@ -30,3 +30,4 @@ private:
     SQLHANDLE env_ = nullptr;
     SQLHANDLE dbc_ = nullptr;
 };
+

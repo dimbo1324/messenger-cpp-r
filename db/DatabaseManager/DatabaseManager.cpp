@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sql.h>
 #include <sqlext.h>
+#include "constants.h"
 DatabaseManager::DatabaseManager()
 {
 }
@@ -46,7 +47,7 @@ bool DatabaseManager::openConnection()
     connStr += ";DATABASE=";
     connStr += DB_NAME;
     connStr += ";";
-    SQLCHAR outConnStr[1024];
+    SQLCHAR outConnStr[WIDTH];
     SQLSMALLINT outConnStrLen;
     SQLRETURN ret = SQLDriverConnect(
         dbc_,
@@ -133,8 +134,8 @@ void DatabaseManager::closeConnection()
 }
 void DatabaseManager::logDiagnostics(short handleType, void *handle)
 {
-    SQLCHAR sqlState[1024];
-    SQLCHAR message[1024];
+    SQLCHAR sqlState[WIDTH];
+    SQLCHAR message[WIDTH];
     if (SQLGetDiagRec(handleType, handle, 1, sqlState, NULL, message, sizeof(message), NULL) == SQL_SUCCESS)
     {
         std::cerr << "SQLState: " << sqlState << " Message: " << message << std::endl;
