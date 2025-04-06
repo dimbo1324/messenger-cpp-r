@@ -1,19 +1,25 @@
 #pragma once
+
 #include <string>
 #include <memory>
 #include "../Message/Message.h"
 #include "../User/User.h"
 #include "../../networking/client/Client.h"
 #include "../../../db/DatabaseManager/DatabaseManager.h"
+
 namespace ChatApp
 {
+
     class Chat
     {
     private:
         DatabaseManager dbManager_;
-        bool _isActive = false;
-        std::shared_ptr<User> _currentUser = nullptr;
+        bool isActive_ = false;
+        std::shared_ptr<User> currentUser_ = nullptr;
         NetApp::Client client_;
+
+        int getValidatedChoice();
+
         void login();
         void signUp();
         void displayChat();
@@ -22,12 +28,14 @@ namespace ChatApp
 
     public:
         Chat(const std::string &serverAddress, unsigned short serverPort);
-        ~Chat() = default;
+        ~Chat();
+
         void start();
-        bool ChatIsActive() const { return _isActive; }
-        std::shared_ptr<User> GetCurrentUser() const { return _currentUser; }
-        void setCurrentUser(const std::shared_ptr<User> &user) { _currentUser = user; }
+        bool isChatActive() const { return isActive_; }
+        std::shared_ptr<User> getCurrentUser() const { return currentUser_; }
+        void setCurrentUser(const std::shared_ptr<User> &user) { currentUser_ = user; }
         void displayLoginMenu();
         void displayUserMenu();
     };
+
 }

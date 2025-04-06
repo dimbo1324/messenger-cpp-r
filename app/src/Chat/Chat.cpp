@@ -3,8 +3,10 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+
 namespace ChatApp
 {
+
     Chat::Chat(const std::string &serverAddress, unsigned short serverPort)
         : client_(serverAddress, serverPort, this), dbManager_()
     {
@@ -15,17 +17,32 @@ namespace ChatApp
         client_.connectToServer();
         client_.startReceiving();
     }
+
     Chat::~Chat()
     {
         dbManager_.closeConnection();
     }
+
     void Chat::start()
     {
-        _isActive = true;
+        isActive_ = true;
     }
+
+    int Chat::getValidatedChoice()
+    {
+        int choice = 0;
+        while (!(std::cin >> choice))
+        {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << "Неверный ввод. Попробуйте снова: ";
+        }
+        return choice;
+    }
+
     void Chat::login()
     {
-        if (_currentUser != nullptr)
+        if (currentUser_ != nullptr)
         {
             std::cout << "Вы уже вошли в систему.\n";
             return;
@@ -48,6 +65,7 @@ namespace ChatApp
             std::cerr << "Исключение при отправке запроса на вход: " << ex.what() << std::endl;
         }
     }
+
     void Chat::signUp()
     {
         std::string login, password, name;
@@ -70,6 +88,7 @@ namespace ChatApp
             std::cerr << "Исключение при отправке запроса на регистрацию: " << ex.what() << std::endl;
         }
     }
+
     void Chat::displayChat()
     {
         try
@@ -97,6 +116,7 @@ namespace ChatApp
             std::cerr << "Исключение при запросе чата: " << ex.what() << std::endl;
         }
     }
+
     void Chat::displayAllUserNames()
     {
         try
@@ -111,6 +131,7 @@ namespace ChatApp
             std::cerr << "Исключение при запросе списка пользователей: " << ex.what() << std::endl;
         }
     }
+
     void Chat::addMessage()
     {
         std::string recipient, text;
@@ -128,8 +149,11 @@ namespace ChatApp
                 return;
             }
             std::cout << "Сообщение отправлено\n";
-            std::string sql = "INSERT INTO messages (chat_id, sender_id, message_text) VALUES (1, 1, '" + text + "');";
-            if (!dbManager_.executeNonQuery(sql))
+            int senderId = (currentUser_ ? currentUser_->getId() : 1);
+            std::ostringstream sqlStream;
+            sqlStream << "INSERT INTO messages (chat_id, sender_id, message_text) VALUES (1, "
+                      << senderId << ", '" << text << "');";
+            if (!dbManager_.executeNonQuery(sqlStream.str()))
             {
                 std::cerr << "Ошибка при сохранении сообщения в базу данных\n";
             }
@@ -139,22 +163,17 @@ namespace ChatApp
             std::cerr << "Исключение при отправке сообщения: " << ex.what() << std::endl;
         }
     }
+
     void Chat::displayLoginMenu()
     {
-        while (_currentUser == nullptr && _isActive)
+        while (currentUser_ == nullptr && isActive_)
         {
             std::cout << "\n--- Меню входа ---\n";
             std::cout << "1. Вход\n";
             std::cout << "2. Регистрация\n";
             std::cout << "3. Выход\n";
             std::cout << "Выберите опцию: ";
-            int choice;
-            while (!(std::cin >> choice))
-            {
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cout << "Неверный ввод. Попробуйте снова: ";
-            }
+            int choice = getValidatedChoice();
             switch (choice)
             {
             case 1:
@@ -165,29 +184,25 @@ namespace ChatApp
                 break;
             case 3:
                 std::cout << "Выход из приложения.\n";
-                _isActive = false;
+                isActive_ = false;
                 return;
             default:
                 std::cout << "Неверный выбор. Попробуйте снова.\n";
+                break;
             }
         }
     }
+
     void Chat::displayUserMenu()
     {
-        while (_isActive && _currentUser != nullptr)
+        while (isActive_ && currentUser_ != nullptr)
         {
             std::cout << "\n--- Меню пользователя ---\n";
             std::cout << "1. Просмотр чата\n";
             std::cout << "2. Отправить сообщение\n";
             std::cout << "3. Выход\n";
             std::cout << "Выберите опцию: ";
-            int choice;
-            while (!(std::cin >> choice))
-            {
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cout << "Неверный ввод. Попробуйте снова: ";
-            }
+            int choice = getValidatedChoice();
             switch (choice)
             {
             case 1:
@@ -198,11 +213,13 @@ namespace ChatApp
                 break;
             case 3:
                 std::cout << "Выход из аккаунта.\n";
-                _currentUser = nullptr;
+                currentUser_ = nullptr;
                 return;
             default:
                 std::cout << "Неверный выбор. Попробуйте снова.\n";
+                break;
             }
         }
     }
+
 }
