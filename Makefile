@@ -3,15 +3,16 @@ CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./app/src -I./db
 LDFLAGS = -lodbc32
 TARGET = Console_chat_by_Dima_Prihodko
 SRCS = \
-	app/main.cpp \
-	app/src/Chat/Chat.cpp \
-	app/src/Chat/utils/Display.cpp \
-	app/src/Chat/utils/Input.cpp \
-	app/src/Chat/utils/Time.cpp \
-	app/src/Message/Message.cpp \
-	app/src/User/User.cpp \
-	include/PlatformOSInfo/PlatformOSInfo.cpp \
-	db/DatabaseManager/DatabaseManager.cpp
+    app/main.cpp \
+    app/src/Chat/Chat.cpp \
+    app/src/Chat/utils/Display.cpp \
+    app/src/Chat/utils/Input.cpp \
+    app/src/Chat/utils/Time.cpp \
+    app/src/Message/Message.cpp \
+    app/src/User/User.cpp \
+    include/PlatformOSInfo/PlatformOSInfo.cpp \
+    db/DatabaseManager/DatabaseManager.cpp \
+    app/networking/client/Client.cpp
 OBJS = $(SRCS:.cpp=.o)
 all: $(TARGET)
 $(TARGET): $(OBJS)
