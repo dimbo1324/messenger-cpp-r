@@ -14,7 +14,7 @@ SERVER_SOURCES = \
 SERVER_OBJECTS = $(SERVER_SOURCES:.cpp=.o)
 server: $(SERVER_TARGET)
 $(SERVER_TARGET): $(SERVER_OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -lws2_32
+	$(CXX) $(CXXFLAGS) -o $@ $^ -lws2_32 -lodbc32
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 clean:
