@@ -4,6 +4,7 @@
 #include <sqlext.h>
 #include <sstream>
 #include <ostream>
+#include <DBConfig.h>
 
 DatabaseManager::DatabaseManager() {}
 
@@ -40,7 +41,7 @@ bool DatabaseManager::init()
 
 bool DatabaseManager::openConnection()
 {
-    std::string connStr = "DSN=PostgreSQL_DSN;";
+    std::string connStr = "DSN=" + std::string(DSN) + ";UID=" + DB_USER + ";PWD=" + DB_PASSWORD + ";";
     SQLCHAR outConnStr[1024];
     SQLSMALLINT outConnStrLen;
     SQLRETURN ret = SQLDriverConnectA(
