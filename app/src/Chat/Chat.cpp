@@ -8,7 +8,7 @@ namespace ChatApp
 {
 
     Chat::Chat(const std::string &serverAddress, unsigned short serverPort)
-        : client_(serverAddress, serverPort, this), dbManager_()
+        : dbManager_(), client_(serverAddress, serverPort, this)
     {
         if (!dbManager_.init() || !dbManager_.openConnection())
         {
