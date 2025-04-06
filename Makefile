@@ -16,7 +16,7 @@ SRCS = \
 OBJS = $(SRCS:.cpp=.o)
 all: $(TARGET)
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDLIBS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 clean:
