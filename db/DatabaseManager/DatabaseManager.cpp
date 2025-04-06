@@ -1,35 +1,17 @@
-#include <string>
-#include <vector>
-#include <sqltypes.h>
-struct QueryResult
-{
-    std::vector<std::vector<std::string>> rows;
-};
-class DatabaseManager
-{
-public:
-    DatabaseManager();
-    ~DatabaseManager();
-    bool init();
-    bool openConnection();
-    bool executeNonQuery(const std::string &sql);
-    bool executeQuery(const std::string &sql, QueryResult &result);
-    void closeConnection();
-private:
-    void logDiagnostics(short handleType, void *handle);
-    SQLHANDLE env_ = nullptr;
-    SQLHANDLE dbc_ = nullptr;
-};
 #include "DatabaseManager.h"
 #include <iostream>
 #include <sql.h>
 #include <sqlext.h>
+#include <sstream>
 #include <ostream>
+
 DatabaseManager::DatabaseManager() {}
+
 DatabaseManager::~DatabaseManager()
 {
     closeConnection();
 }
+
 bool DatabaseManager::init()
 {
     SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &env_);
@@ -55,13 +37,14 @@ bool DatabaseManager::init()
     std::cout << "ODBC инициализирован успешно." << std::endl;
     return true;
 }
+
 bool DatabaseManager::openConnection()
 {
-    std::string connStr = "DSN=PostgreSQL_DSN;"; // Используем DSN из конфигурации
+    std::string connStr = "DSN=PostgreSQL_DSN;";
     SQLCHAR outConnStr[1024];
     SQLSMALLINT outConnStrLen;
     SQLRETURN ret = SQLDriverConnectA(
-        dbc_, NULL, (SQLCHAR *)connStr.c_str(), SQL_NTS,
+        dbc_, nullptr, (SQLCHAR *)connStr.c_str(), SQL_NTS,
         outConnStr, sizeof(outConnStr), &outConnStrLen, SQL_DRIVER_COMPLETE);
     if (!SQL_SUCCEEDED(ret))
     {
@@ -72,6 +55,7 @@ bool DatabaseManager::openConnection()
     std::cout << "Соединение с базой данных установлено." << std::endl;
     return true;
 }
+
 bool DatabaseManager::executeNonQuery(const std::string &sql)
 {
     SQLHANDLE stmt;
@@ -92,6 +76,7 @@ bool DatabaseManager::executeNonQuery(const std::string &sql)
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return true;
 }
+
 bool DatabaseManager::executeQuery(const std::string &sql, QueryResult &result)
 {
     SQLHANDLE stmt;
@@ -133,6 +118,7 @@ bool DatabaseManager::executeQuery(const std::string &sql, QueryResult &result)
     SQLFreeHandle(SQL_HANDLE_STMT, stmt);
     return true;
 }
+
 void DatabaseManager::closeConnection()
 {
     if (dbc_)
@@ -148,11 +134,12 @@ void DatabaseManager::closeConnection()
     }
     std::cout << "Соединение с базой данных закрыто." << std::endl;
 }
+
 void DatabaseManager::logDiagnostics(short handleType, void *handle)
 {
     SQLCHAR sqlState[1024];
     SQLCHAR message[1024];
-    if (SQLGetDiagRecA(handleType, handle, 1, sqlState, NULL, message, sizeof(message), NULL) == SQL_SUCCESS)
+    if (SQLGetDiagRecA(handleType, handle, 1, sqlState, nullptr, message, sizeof(message), nullptr) == SQL_SUCCESS)
     {
         std::cerr << "SQLState: " << sqlState << " Message: " << message << std::endl;
     }
