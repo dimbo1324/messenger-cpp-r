@@ -4,8 +4,7 @@
 #include <sqlext.h>
 #include <sstream>
 #include <ostream>
-#include <DBConfig.h>
-
+#include "../DBConfig.h"
 DatabaseManager::DatabaseManager() {}
 
 DatabaseManager::~DatabaseManager()
