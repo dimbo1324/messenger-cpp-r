@@ -1,6 +1,3 @@
-------------------------------------------------------------------
--- functions and help tables
-------------------------------------------------------------------
 create or replace function update_updated_at_column()
 returns trigger as
 $$
@@ -28,9 +25,6 @@ values (old.message_id, old.message_text, new.message_text, old.status, new.stat
 return new;
 end;
 $$ language plpgsql;
-------------------------------------------------------------------
--- triggers
-------------------------------------------------------------------
 create trigger update_users_updated_at
 before update
 on users
