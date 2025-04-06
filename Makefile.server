@@ -9,7 +9,8 @@ SERVER_SOURCES = \
     app/src/Chat/utils/Input.cpp \
     app/src/Chat/utils/Time.cpp \
     app/src/Message/Message.cpp \
-    app/src/User/User.cpp
+    app/src/User/User.cpp \
+    db/DatabaseManager/DatabaseManager.cpp
 SERVER_OBJECTS = $(SERVER_SOURCES:.cpp=.o)
 server: $(SERVER_TARGET)
 $(SERVER_TARGET): $(SERVER_OBJECTS)
