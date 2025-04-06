@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./app/src -I./db
-LDFLAGS = -lodbc32
+LDLIBS = -lodbc32 -lws2_32
 TARGET = Console_chat_by_Dima_Prihodko
 SRCS = \
     app/main.cpp \
