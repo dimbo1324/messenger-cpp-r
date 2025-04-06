@@ -1,7 +1,8 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./include/PlatformOSInfo -I./app/src
+CXXFLAGS = -Wall -Wextra -O2 -std=c++23 -I./include -I./app/src -I./db
+LDFLAGS = -lodbc32
 TARGET = Console_chat_by_Dima_Prihodko
-SOURCES = \
+SRCS = \
 	app/main.cpp \
 	app/src/Chat/Chat.cpp \
 	app/src/Chat/utils/Display.cpp \
@@ -9,15 +10,16 @@ SOURCES = \
 	app/src/Chat/utils/Time.cpp \
 	app/src/Message/Message.cpp \
 	app/src/User/User.cpp \
-	include/PlatformOSInfo/PlatformOSInfo.cpp
-OBJECTS = $(SOURCES:.cpp=.o)
+	include/PlatformOSInfo/PlatformOSInfo.cpp \
+	db/DatabaseManager/DatabaseManager.cpp
+OBJS = $(SRCS:.cpp=.o)
 all: $(TARGET)
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJS) $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 install: $(TARGET)
