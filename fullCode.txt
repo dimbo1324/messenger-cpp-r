@@ -1,0 +1,1538 @@
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\DBConfig.h -----
+#pragma once
+#define DSN "Chat_pgsql_DSN"
+#define DB_USER "postgres"
+#define DB_PASSWORD "545687"
+#define DB_NAME "chat_db"
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\DatabaseManager\DatabaseManager.cpp -----
+#include "DatabaseManager.h"
+#include <iostream>
+#include <sql.h>
+#include <sqlext.h>
+#include <sstream>
+#include <ostream>
+#include "../DBConfig.h"
+DatabaseManager::DatabaseManager() {}
+DatabaseManager::~DatabaseManager()
+{
+closeConnection();
+}
+bool DatabaseManager::init()
+{
+SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &env_);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка: не удалось создать environment handle." << std::endl;
+return false;
+}
+ret = SQLSetEnvAttr(env_, SQL_ATTR_ODBC_VERSION, (void *)SQL_OV_ODBC3, 0);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка: не удалось установить версию ODBC." << std::endl;
+SQLFreeHandle(SQL_HANDLE_ENV, env_);
+return false;
+}
+ret = SQLAllocHandle(SQL_HANDLE_DBC, env_, &dbc_);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка: не удалось создать connection handle." << std::endl;
+SQLFreeHandle(SQL_HANDLE_ENV, env_);
+return false;
+}
+std::cout << "ODBC инициализирован успешно." << std::endl;
+return true;
+}
+bool DatabaseManager::openConnection()
+{
+std::string connStr = "DSN=" + std::string(DSN) + ";UID=" + DB_USER + ";PWD=" + DB_PASSWORD + ";";
+SQLCHAR outConnStr[1024];
+SQLSMALLINT outConnStrLen;
+SQLRETURN ret = SQLDriverConnectA(
+dbc_, nullptr, (SQLCHAR *)connStr.c_str(), SQL_NTS,
+outConnStr, sizeof(outConnStr), &outConnStrLen, SQL_DRIVER_COMPLETE);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка: не удалось подключиться к базе данных." << std::endl;
+logDiagnostics(SQL_HANDLE_DBC, dbc_);
+return false;
+}
+std::cout << "Соединение с базой данных установлено." << std::endl;
+return true;
+}
+bool DatabaseManager::executeNonQuery(const std::string &sql)
+{
+SQLHANDLE stmt;
+SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, dbc_, &stmt);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка: не удалось создать statement handle." << std::endl;
+return false;
+}
+ret = SQLExecDirectA(stmt, (SQLCHAR *)sql.c_str(), SQL_NTS);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка при выполнении запроса: " << sql << std::endl;
+logDiagnostics(SQL_HANDLE_STMT, stmt);
+SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+return false;
+}
+SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+return true;
+}
+bool DatabaseManager::executeQuery(const std::string &sql, QueryResult &result)
+{
+SQLHANDLE stmt;
+SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, dbc_, &stmt);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка: не удалось создать statement handle для SELECT." << std::endl;
+return false;
+}
+ret = SQLExecDirectA(stmt, (SQLCHAR *)sql.c_str(), SQL_NTS);
+if (!SQL_SUCCEEDED(ret))
+{
+std::cerr << "Ошибка при выполнении SELECT: " << sql << std::endl;
+logDiagnostics(SQL_HANDLE_STMT, stmt);
+SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+return false;
+}
+SQLSMALLINT numCols;
+SQLNumResultCols(stmt, &numCols);
+while (SQLFetch(stmt) == SQL_SUCCESS)
+{
+std::vector<std::string> row;
+for (SQLSMALLINT i = 1; i <= numCols; ++i)
+{
+SQLCHAR buffer[256];
+SQLLEN indicator;
+ret = SQLGetData(stmt, i, SQL_C_CHAR, buffer, sizeof(buffer), &indicator);
+if (SQL_SUCCEEDED(ret) && indicator != SQL_NULL_DATA)
+{
+row.push_back(std::string((char *)buffer));
+}
+else
+{
+row.push_back("");
+}
+}
+result.rows.push_back(row);
+}
+SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+return true;
+}
+void DatabaseManager::closeConnection()
+{
+if (dbc_)
+{
+SQLDisconnect(dbc_);
+SQLFreeHandle(SQL_HANDLE_DBC, dbc_);
+dbc_ = nullptr;
+}
+if (env_)
+{
+SQLFreeHandle(SQL_HANDLE_ENV, env_);
+env_ = nullptr;
+}
+std::cout << "Соединение с базой данных закрыто." << std::endl;
+}
+void DatabaseManager::logDiagnostics(short handleType, void *handle)
+{
+SQLCHAR sqlState[1024];
+SQLCHAR message[1024];
+if (SQLGetDiagRecA(handleType, handle, 1, sqlState, nullptr, message, sizeof(message), nullptr) == SQL_SUCCESS)
+{
+std::cerr << "SQLState: " << sqlState << " Message: " << message << std::endl;
+}
+}
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\DatabaseManager\DatabaseManager.h -----
+#pragma once
+#include <string>
+#include <vector>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+#include <sqltypes.h>
+struct QueryResult
+{
+std::vector<std::vector<std::string>> rows;
+};
+class DatabaseManager
+{
+public:
+DatabaseManager();
+~DatabaseManager();
+bool init();
+bool openConnection();
+bool executeNonQuery(const std::string &sql);
+bool executeQuery(const std::string &sql, QueryResult &result);
+void closeConnection();
+private:
+void logDiagnostics(short handleType, void *handle);
+SQLHANDLE env_ = nullptr;
+SQLHANDLE dbc_ = nullptr;
+};
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_1\description.txt -----
+🎯 Цели проекта
+🛠️ Функциональность:  
+📌 Поддержка регистрации пользователей, аутентификации, отправки и получения сообщений (как личных, так и групповых).
+📌 Обеспечение масштабируемости для добавления новых функций (вложения, групповые чаты, уведомления и другие).
+🛠️ Нормализация:  
+📌 Достижение нормальной формы 5NF для минимизации избыточности данных и предотвращения аномалий при обновлении.
+🛠️ Безопасность:  
+📌 Защита данных пользователей через хранение хешей паролей.
+📌 Контроль доступа с использованием ограничений и ролей.
+📌 Предотвращение SQL-инъекций посредством параметризованных запросов.
+🗃️ Структура базы данных
+⚡ Таблица Users
+❓ Назначение: Хранение информации о пользователях чата.
+📌 user_id (PK, автоинкремент)  
+📌 login (уникальное, обязательное)  
+📌 password_hash (хеш пароля, обязательное)  
+📌 name (обязательное)  
+📌 created_at (дата создания записи)  
+⚠️ Поле для хранения salt, если требуется алгоритм хеширования.
+⚡ Таблица Chats
+❓ Назначение: Хранение информации о чатах (личных и групповых).
+📌 chat_id (PK, автоинкремент)  
+📌 chat_type (тип чата: личный/групповой)  
+📌 created_at (дата создания)  
+⚠️ chat_name для групповых чатов, описание.
+⚡ Таблица ChatParticipants
+❓ Назначение: Связующая таблица для участников чатов.
+📌 chat_id (FK, обязательное)  
+📌 user_id (FK, обязательное)  
+📌 joined_at (дата присоединения)  
+🔑 Ключи: составной первичный ключ (chat_id, user_id).
+⚡ Таблица Messages
+❓ Назначение: Хранение отправленных сообщений.
+📌 message_id (PK, автоинкремент)  
+📌 chat_id (FK, обязательное)  
+📌 sender_id (FK, обязательное)  
+📌 message_text (текст сообщения)  
+📌 sent_at (дата и время отправки)  
+⚠️ Флаг, указывающий, что сообщение было отредактировано.
+⚡ Таблица MessageRecipients
+❓ Назначение: Отслеживание получателей сообщений и их статуса.
+📌 message_id (FK, обязательное)  
+📌 recipient_id (FK, обязательное)  
+📌 status (например: 'отправлено', 'доставлено', 'прочитано')  
+🔑 Ключи: составной первичный ключ (message_id, recipient_id).
+⚡ Таблица UserRoles
+❓ Назначение: Определение ролей пользователей (например, администратор, модератор).
+📌 role_id (PK, автоинкремент)  
+📌 role_name (уникальное, обязательное)  
+⚠️ Описание роли, приоритет.
+⚡ Таблица ChatRoles
+❓ Назначение: Связывание пользователей, чатов и ролей в этих чатах.
+📌 chat_id (FK, обязательное)  
+📌 user_id (FK, обязательное)  
+📌 role_id (FK, обязательное)  
+🔑 Ключи: составной первичный ключ (chat_id, user_id, role_id).
+⚡ Таблица Attachments
+❓ Назначение: Хранение информации о вложениях в сообщениях.
+📌 attachment_id (PK, автоинкремент)  
+📌 message_id (FK, обязательное)  
+📌 file_path (путь к файлу, обязательное)  
+📌 file_type (тип файла, обязательное)  
+⚠️ Размер файла, дата загрузки.
+🔒 Меры по обеспечению безопасности и целостности данных
+⚡ Хеширование паролей:  
+📌 Пароли должны храниться в виде хешей с использованием современных алгоритмов (bcrypt, Argon2).
+⚡ Параметризованные запросы:  
+📌 Все взаимодействия с БД должны выполняться через подготовленные выражения (prepared statements) для защиты от SQL-инъекций.
+⚡ Ограничения (Constraints):  
+📌 PRIMARY KEY: Для уникальной идентификации записей.
+📌 FOREIGN KEY: Для обеспечения ссылочной целостности между таблицами.
+📌 UNIQUE: Например, на поле login в таблице Users и role_name в таблице UserRoles.
+📌 CHECK: Для контроля допустимых значений, например, для поля status в MessageRecipients (только 'отправлено', 'доставлено', 'прочитано').
+⚡ Индексы:  
+📌 Создание индексов на часто используемых полях (например, login, sent_at, внешние ключи) для ускорения запросов.
+🛠️ Применение дополнительных технологий СУБД
+🔄 Триггеры
+❓ Назначение: Автоматизация рутинных операций.
+🔎 Триггер для автоматического обновления поля updated_at в таблице Users при изменении данных.
+🔎 Логирование изменений в таблице Messages (например, фиксирование изменений статуса или редактирования сообщений).
+📦 Хранимые процедуры
+❓ Назначение: Инкапсуляция бизнес-логики на стороне базы данных.
+🔎 Процедура регистрации пользователя: проверка уникальности логина, хеширование пароля и вставка записи в таблицу Users.
+🔎 Процедура отправки сообщения: вставка записи в таблицу Messages и соответствующих записей в таблицу MessageRecipients в рамках одной транзакции.
+🗄️ Индексы
+❓ Назначение: Оптимизация производительности запросов.
+🔎 Уникальный индекс на login в таблице Users.
+🔎 Индексы на внешние ключи (например, chat_id в Messages, user_id в ChatParticipants).
+🔎 Индекс на поле sent_at в таблице Messages для ускорения выборки истории.
+🚫 Ограничения
+❓ Назначение: Обеспечение целостности данных.
+🔎 Ограничения целостности через FOREIGN KEY для связывания таблиц.
+🔎 Составные первичные ключи в таблицах ChatParticipants, MessageRecipients и ChatRoles для предотвращения дублирования.
+🔎 CHECK-ограничения для значений статуса сообщений.
+🔄 Транзакции
+❓ Назначение: Обеспечение атомарности и целостности операций (ACID).
+🔎 Транзакции при регистрации пользователя: все операции (проверка уникальности, вставка записи) должны выполняться атомарно.
+🔎 Транзакции при отправке сообщения: вставка в Messages и соответствующие записи в MessageRecipients должны выполняться в одной транзакции, чтобы обеспечить согласованность.
+📋 Итого
+1. Разработка структуры базы данных:  
+📌 Создать все перечисленные таблицы с необходимыми полями, типами данных и ограничениями (PK, FK, UNIQUE, CHECK).  
+📌 Обеспечить нормализацию до 5NF.
+2. Обеспечение безопасности:  
+📌 Настроить хранение паролей в виде хешей (с применением salt при необходимости).  
+📌 Реализовать все запросы к БД через подготовленные выражения для защиты от SQL-инъекций.
+3. Оптимизация производительности:  
+📌 Создать необходимые индексы для ускорения выполнения запросов.  
+📌 Настроить FOREIGN KEY для поддержки ссылочной целостности.
+4. Интеграция дополнительных функций:  
+📌 Разработать хранимые процедуры для регистрации пользователей и отправки сообщений, включающие транзакционное выполнение операций.  
+📌 Реализовать триггеры для автоматического обновления временных меток и логирования изменений.
+5. Тестирование и отладка:  
+📌 Провести тестирование всех операций (регистрация, логин, отправка/получение сообщений) с использованием тестовых данных.  
+📌 Настроить систему логирования ошибок и диагностики для оперативного выявления проблем.
+6. Документация:  
+📌 Подготовить подробную документацию по структуре базы данных, логике хранимых процедур и триггеров, а также инструкции для разработчиков по интеграции с приложением.
+🌐 Среда выполнения
+📌 ОС: Windows 11  
+📌 СУБД: PostgreSQL 16 с подключением через ODBC  
+📌 Язык разработки: C++ (стандарт C++23)  
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_1\backUp\console.txt -----
+[2025-04-04 20:21:27] Connected to chat_db
+chat_db.help_schema> set search_path = "help_schema"
+[2025-04-04 20:21:27] completed in 2 ms
+chat_db.help_schema> create table users
+(
+user_id       serial primary key,
+login         varchar(50) unique not null,
+password_hash varchar(255)       not null,
+name          varchar(100)       not null,
+created_at    timestamp default current_timestamp,
+salt          varchar(255)
+)
+[2025-04-04 21:00:27] completed in 120 ms
+chat_db.help_schema> create table chats
+(
+chat_id    serial primary key,
+chat_type  varchar(10) not null check (chat_type in ('личный', 'групповой')),
+chat_name  varchar(100),
+created_at timestamp default current_timestamp
+)
+[2025-04-04 21:00:27] completed in 11 ms
+chat_db.help_schema> create table chat_participants
+(
+chat_id   int not null,
+user_id   int not null,
+joined_at timestamp default current_timestamp,
+primary key (chat_id, user_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id)
+)
+[2025-04-04 21:00:27] completed in 25 ms
+chat_db.help_schema> create table messages
+(
+message_id   serial primary key,
+chat_id      int  not null,
+sender_id    int  not null,
+message_text text not null,
+sent_at      timestamp default current_timestamp,
+edited       boolean   default false,
+foreign key (chat_id) references chats (chat_id),
+foreign key (sender_id) references users (user_id)
+)
+[2025-04-04 21:00:27] completed in 16 ms
+chat_db.help_schema> create table message_recipients
+(
+message_id   int         not null,
+recipient_id int         not null,
+status       varchar(20) not null check ( status in ('отправлено', 'доставлено', 'прочитано')),
+primary key (message_id, recipient_id),
+foreign key (message_id) references messages (message_id),
+foreign key (recipient_id) references users (user_id)
+)
+[2025-04-04 21:00:27] completed in 7 ms
+chat_db.help_schema> create table user_roles
+(
+role_id   serial primary key,
+role_name varchar(50) unique not null
+)
+[2025-04-04 21:00:27] completed in 8 ms
+chat_db.help_schema> create table chat_roles
+(
+chat_id int not null,
+user_id int not null,
+role_id int not null,
+primary key (chat_id,
+user_id,
+role_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id),
+foreign key (role_id) references user_roles (role_id)
+)
+[2025-04-04 21:00:27] completed in 8 ms
+chat_db.help_schema> create table attachments
+(
+attachment_id serial primary key,
+message_id    int          not null,
+file_path     varchar(255) not null,
+file_type     varchar(50)  not null,
+file_size     int,
+uploaded_at   timestamp default current_timestamp,
+foreign key (message_id) references messages (message_id)
+)
+[2025-04-04 21:00:27] completed in 6 ms
+chat_db.help_schema> create index idx_user_login on users (login)
+[2025-04-04 21:17:28] completed in 11 ms
+chat_db.help_schema> create index idx_messages_sent_at on messages (sent_at)
+[2025-04-04 21:17:28] completed in 3 ms
+chat_db.help_schema>
+create or replace function update_updated_at_column()
+returns trigger as
+$$
+begin
+new.update_at = current_timestamp;
+return new;
+end
+$$ language plpgsql
+[2025-04-04 21:46:11] completed in 91 ms
+chat_db.help_schema> create table message_logs
+(
+log_id     serial primary key,
+message_id int not null,
+old_text   text,
+new_text   text,
+old_status varchar(20),
+new_status varchar(20),
+changed_at timestamp default current_timestamp
+)
+[2025-04-04 21:46:11] completed in 8 ms
+chat_db.help_schema> create or replace function log_messages_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, old_text, new_text, old_status, new_status)
+values (old.message_id, old.message_text, new.message_text, old.status, new.status);
+return new;
+end;
+$$ language plpgsql
+[2025-04-04 21:46:11] completed in 2 ms
+chat_db.help_schema>
+create trigger update_users_updated_at
+before update
+on users
+for each row
+execute function update_updated_at_column()
+[2025-04-04 21:46:11] completed in 3 ms
+chat_db.help_schema> create trigger log_messages_changes
+after update
+on messages
+for each row
+when ( old is distinct from new)
+execute function log_messages_changes()
+[2025-04-04 21:46:11] completed in 2 ms
+chat_db.help_schema> create extension if not exists pgcrypto
+[2025-04-06 10:00:51] completed in 143 ms
+[2025-04-06 11:15:03] Connected to chat_db
+chat_db.help_schema> set search_path = "help_schema"
+[2025-04-06 11:15:03] completed in 2 ms
+chat_db.help_schema> create or replace function register_user(
+p_login varchar,
+p_password varchar,
+p_name varchar
+)
+returns void as
+$$
+declare
+v_salt          varchar(255);
+v_password_hash varchar(255);
+begin
+if exists(select 1 from users where login = p_login) then
+raise exception 'Логин уже существует: %', p_login;
+end if;
+v_salt := gen_salt('bf');
+v_password_hash := crypt(p_password, v_salt);
+insert into users (login, password_hash, name, salt)
+values (p_login, v_password_hash, p_name, v_salt);
+end
+$$ language plpgsql
+[2025-04-06 11:15:03] completed in 71 ms
+chat_db.help_schema> create or replace procedure send_message(
+p_chat_id int,
+p_sender_id int,
+p_message_text text,
+p_recipient_ids int[]
+)
+language plpgsql
+as
+$$
+declare
+v_message_id int;
+recipient    int;
+begin
+insert into messages(chat_id, sender_id, message_text)
+values (p_chat_id, p_sender_id, p_message_text)
+returning message_id into v_message_id;
+foreach recipient in array p_recipient_ids
+loop
+insert into message_recipients(message_id, recipient_id, status)
+values (v_message_id, recipient, 'отправлено');
+end loop;
+end;
+$$
+[2025-04-06 11:15:03] completed in 5 ms
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_1\backUp\indexes\scripts.sql -----
+create index idx_user_login on users (login);
+create index idx_messages_sent_at on messages (sent_at);
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_1\backUp\procedures\scripts.sql -----
+create extension if not exists pgcrypto;
+create or replace function register_user(
+p_login varchar,
+p_password varchar,
+p_name varchar
+)
+returns void as
+$$
+declare
+v_salt          varchar(255);
+v_password_hash varchar(255);
+begin
+if exists(select 1 from users where login = p_login) then
+raise exception 'Логин уже существует: %', p_login;
+end if;
+v_salt := gen_salt('bf');
+v_password_hash := crypt(p_password, v_salt);
+insert into users (login, password_hash, name, salt)
+values (p_login, v_password_hash, p_name, v_salt);
+end
+$$ language plpgsql;
+create or replace procedure send_message(
+p_chat_id int,
+p_sender_id int,
+p_message_text text,
+p_recipient_ids int[]
+)
+language plpgsql
+as
+$$
+declare
+v_message_id int;
+recipient    int;
+begin
+insert into messages(chat_id, sender_id, message_text)
+values (p_chat_id, p_sender_id, p_message_text)
+returning message_id into v_message_id;
+foreach recipient in array p_recipient_ids
+loop
+insert into message_recipients(message_id, recipient_id, status)
+values (v_message_id, recipient, 'отправлено');
+end loop;
+end;
+$$;
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_1\backUp\shema\scripts.sql -----
+create table users
+(
+user_id       serial primary key,
+login         varchar(50) unique not null,
+password_hash varchar(255)       not null,
+name          varchar(100)       not null,
+created_at    timestamp default current_timestamp,
+salt          varchar(255)
+);
+create table chats
+(
+chat_id    serial primary key,
+chat_type  varchar(10) not null check (chat_type in ('личный', 'групповой')),
+chat_name  varchar(100),
+created_at timestamp default current_timestamp
+);
+create table chat_participants
+(
+chat_id   int not null,
+user_id   int not null,
+joined_at timestamp default current_timestamp,
+primary key (chat_id, user_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id)
+);
+create table messages
+(
+message_id   serial primary key,
+chat_id      int  not null,
+sender_id    int  not null,
+message_text text not null,
+sent_at      timestamp default current_timestamp,
+edited       boolean   default false,
+foreign key (chat_id) references chats (chat_id),
+foreign key (sender_id) references users (user_id)
+);
+create table message_recipients
+(
+message_id   int         not null,
+recipient_id int         not null,
+status       varchar(20) not null check ( status in ('отправлено', 'доставлено', 'прочитано')),
+primary key (message_id, recipient_id),
+foreign key (message_id) references messages (message_id),
+foreign key (recipient_id) references users (user_id)
+);
+create table user_roles
+(
+role_id   serial primary key,
+role_name varchar(50) unique not null
+);
+create table chat_roles
+(
+chat_id int not null,
+user_id int not null,
+role_id int not null,
+primary key (chat_id,
+user_id,
+role_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id),
+foreign key (role_id) references user_roles (role_id)
+);
+create table attachments
+(
+attachment_id serial primary key,
+message_id    int          not null,
+file_path     varchar(255) not null,
+file_type     varchar(50)  not null,
+file_size     int,
+uploaded_at   timestamp default current_timestamp,
+foreign key (message_id) references messages (message_id)
+);
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_1\backUp\triggers\scripts.sql -----
+create or replace function update_updated_at_column()
+returns trigger as
+$$
+begin
+new.update_at = current_timestamp;
+return new;
+end
+$$ language plpgsql;
+create table message_logs
+(
+log_id     serial primary key,
+message_id int not null,
+old_text   text,
+new_text   text,
+old_status varchar(20),
+new_status varchar(20),
+changed_at timestamp default current_timestamp
+);
+create or replace function log_messages_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, old_text, new_text, old_status, new_status)
+values (old.message_id, old.message_text, new.message_text, old.status, new.status);
+return new;
+end;
+$$ language plpgsql;
+create trigger update_users_updated_at
+before update
+on users
+for each row
+execute function update_updated_at_column();
+create trigger log_messages_changes
+after update
+on messages
+for each row
+when ( old is distinct from new)
+execute function log_messages_changes();
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_2\description.txt -----
+🎯 Цели проекта
+🛠️ Функциональность:  
+📌 Поддержка регистрации пользователей, аутентификации, отправки и получения сообщений (как личных, так и групповых).
+📌 Обеспечение масштабируемости для добавления новых функций (вложения, групповые чаты, уведомления и другие).
+🛠️ Нормализация:  
+📌 Достижение нормальной формы 5NF для минимизации избыточности данных и предотвращения аномалий при обновлении.
+🛠️ Безопасность:  
+📌 Защита данных пользователей через хранение хешей паролей.
+📌 Контроль доступа с использованием ограничений и ролей.
+📌 Предотвращение SQL-инъекций посредством параметризованных запросов.
+🗃️ Структура базы данных
+⚡ Таблица Users
+❓ Назначение: Хранение информации о пользователях чата.
+📌 user_id (PK, автоинкремент)  
+📌 login (уникальное, обязательное)  
+📌 password_hash (хеш пароля, обязательное)  
+📌 name (обязательное)  
+📌 created_at (дата создания записи)  
+⚠️ Поле для хранения salt, если требуется алгоритм хеширования.
+⚡ Таблица Chats
+❓ Назначение: Хранение информации о чатах (личных и групповых).
+📌 chat_id (PK, автоинкремент)  
+📌 chat_type (тип чата: личный/групповой)  
+📌 created_at (дата создания)  
+⚠️ chat_name для групповых чатов, описание.
+⚡ Таблица ChatParticipants
+❓ Назначение: Связующая таблица для участников чатов.
+📌 chat_id (FK, обязательное)  
+📌 user_id (FK, обязательное)  
+📌 joined_at (дата присоединения)  
+🔑 Ключи: составной первичный ключ (chat_id, user_id).
+⚡ Таблица Messages
+❓ Назначение: Хранение отправленных сообщений.
+📌 message_id (PK, автоинкремент)  
+📌 chat_id (FK, обязательное)  
+📌 sender_id (FK, обязательное)  
+📌 message_text (текст сообщения)  
+📌 sent_at (дата и время отправки)  
+⚠️ Флаг, указывающий, что сообщение было отредактировано.
+⚡ Таблица MessageRecipients
+❓ Назначение: Отслеживание получателей сообщений и их статуса.
+📌 message_id (FK, обязательное)  
+📌 recipient_id (FK, обязательное)  
+📌 status (например: 'отправлено', 'доставлено', 'прочитано')  
+🔑 Ключи: составной первичный ключ (message_id, recipient_id).
+⚡ Таблица UserRoles
+❓ Назначение: Определение ролей пользователей (например, администратор, модератор).
+📌 role_id (PK, автоинкремент)  
+📌 role_name (уникальное, обязательное)  
+⚠️ Описание роли, приоритет.
+⚡ Таблица ChatRoles
+❓ Назначение: Связывание пользователей, чатов и ролей в этих чатах.
+📌 chat_id (FK, обязательное)  
+📌 user_id (FK, обязательное)  
+📌 role_id (FK, обязательное)  
+🔑 Ключи: составной первичный ключ (chat_id, user_id, role_id).
+⚡ Таблица Attachments
+❓ Назначение: Хранение информации о вложениях в сообщениях.
+📌 attachment_id (PK, автоинкремент)  
+📌 message_id (FK, обязательное)  
+📌 file_path (путь к файлу, обязательное)  
+📌 file_type (тип файла, обязательное)  
+⚠️ Размер файла, дата загрузки.
+🔒 Меры по обеспечению безопасности и целостности данных
+⚡ Хеширование паролей:  
+📌 Пароли должны храниться в виде хешей с использованием современных алгоритмов (bcrypt, Argon2).
+⚡ Параметризованные запросы:  
+📌 Все взаимодействия с БД должны выполняться через подготовленные выражения (prepared statements) для защиты от SQL-инъекций.
+⚡ Ограничения (Constraints):  
+📌 PRIMARY KEY: Для уникальной идентификации записей.
+📌 FOREIGN KEY: Для обеспечения ссылочной целостности между таблицами.
+📌 UNIQUE: Например, на поле login в таблице Users и role_name в таблице UserRoles.
+📌 CHECK: Для контроля допустимых значений, например, для поля status в MessageRecipients (только 'отправлено', 'доставлено', 'прочитано').
+⚡ Индексы:  
+📌 Создание индексов на часто используемых полях (например, login, sent_at, внешние ключи) для ускорения запросов.
+🛠️ Применение дополнительных технологий СУБД
+🔄 Триггеры
+❓ Назначение: Автоматизация рутинных операций.
+🔎 Триггер для автоматического обновления поля updated_at в таблице Users при изменении данных.
+🔎 Логирование изменений в таблице Messages (например, фиксирование изменений статуса или редактирования сообщений).
+📦 Хранимые процедуры
+❓ Назначение: Инкапсуляция бизнес-логики на стороне базы данных.
+🔎 Процедура регистрации пользователя: проверка уникальности логина, хеширование пароля и вставка записи в таблицу Users.
+🔎 Процедура отправки сообщения: вставка записи в таблицу Messages и соответствующих записей в таблицу MessageRecipients в рамках одной транзакции.
+🗄️ Индексы
+❓ Назначение: Оптимизация производительности запросов.
+🔎 Уникальный индекс на login в таблице Users.
+🔎 Индексы на внешние ключи (например, chat_id в Messages, user_id в ChatParticipants).
+🔎 Индекс на поле sent_at в таблице Messages для ускорения выборки истории.
+🚫 Ограничения
+❓ Назначение: Обеспечение целостности данных.
+🔎 Ограничения целостности через FOREIGN KEY для связывания таблиц.
+🔎 Составные первичные ключи в таблицах ChatParticipants, MessageRecipients и ChatRoles для предотвращения дублирования.
+🔎 CHECK-ограничения для значений статуса сообщений.
+🔄 Транзакции
+❓ Назначение: Обеспечение атомарности и целостности операций (ACID).
+🔎 Транзакции при регистрации пользователя: все операции (проверка уникальности, вставка записи) должны выполняться атомарно.
+🔎 Транзакции при отправке сообщения: вставка в Messages и соответствующие записи в MessageRecipients должны выполняться в одной транзакции, чтобы обеспечить согласованность.
+📋 Итого
+1. Разработка структуры базы данных:  
+📌 Создать все перечисленные таблицы с необходимыми полями, типами данных и ограничениями (PK, FK, UNIQUE, CHECK).  
+📌 Обеспечить нормализацию до 5NF.
+2. Обеспечение безопасности:  
+📌 Настроить хранение паролей в виде хешей (с применением salt при необходимости).  
+📌 Реализовать все запросы к БД через подготовленные выражения для защиты от SQL-инъекций.
+3. Оптимизация производительности:  
+📌 Создать необходимые индексы для ускорения выполнения запросов.  
+📌 Настроить FOREIGN KEY для поддержки ссылочной целостности.
+4. Интеграция дополнительных функций:  
+📌 Разработать хранимые процедуры для регистрации пользователей и отправки сообщений, включающие транзакционное выполнение операций.  
+📌 Реализовать триггеры для автоматического обновления временных меток и логирования изменений.
+5. Тестирование и отладка:  
+📌 Провести тестирование всех операций (регистрация, логин, отправка/получение сообщений) с использованием тестовых данных.  
+📌 Настроить систему логирования ошибок и диагностики для оперативного выявления проблем.
+6. Документация:  
+📌 Подготовить подробную документацию по структуре базы данных, логике хранимых процедур и триггеров, а также инструкции для разработчиков по интеграции с приложением.
+🌐 Среда выполнения
+📌 ОС: Windows 11  
+📌 СУБД: PostgreSQL 16 с подключением через ODBC  
+📌 Язык разработки: C++ (стандарт C++23)  
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_2\backUp\console.txt -----
+[2025-04-06 11:50:19] completed in 4 ms
+chat_db.general_schema> create extension if not exists pgcrypto
+[2025-04-06 11:50:37] completed in 6 ms
+chat_db.general_schema> create table users
+(
+user_id       serial primary key,
+login         varchar(50) unique not null,
+password_hash varchar(512)       not null,
+name          varchar(100)       not null,
+created_at    timestamp default current_timestamp,
+update_at     timestamp default current_timestamp,
+salt          varchar(255)
+)
+[2025-04-06 11:50:55] completed in 44 ms
+chat_db.general_schema> create table chats
+(
+chat_id     serial primary key,
+chat_type   varchar(10) not null check (chat_type in ('личный', 'групповой')),
+chat_name   varchar(100),
+description text,
+created_at  timestamp default current_timestamp
+)
+[2025-04-06 11:50:55] completed in 9 ms
+chat_db.general_schema> create table chat_participants
+(
+chat_id   int not null,
+user_id   int not null,
+joined_at timestamp default current_timestamp,
+primary key (chat_id, user_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id)
+)
+[2025-04-06 11:50:55] completed in 5 ms
+chat_db.general_schema> create table messages
+(
+message_id   serial primary key,
+chat_id      int  not null,
+sender_id    int  not null,
+message_text text not null,
+sent_at      timestamp default current_timestamp,
+edited       boolean   default false,
+foreign key (chat_id) references chats (chat_id),
+foreign key (sender_id) references users (user_id)
+)
+[2025-04-06 11:50:55] completed in 9 ms
+chat_db.general_schema> create table message_recipients
+(
+message_id   int         not null,
+recipient_id int         not null,
+status       varchar(20) not null check (status in ('отправлено', 'доставлено', 'прочитано')),
+primary key (message_id, recipient_id),
+foreign key (message_id) references messages (message_id),
+foreign key (recipient_id) references users (user_id)
+)
+[2025-04-06 11:50:55] completed in 6 ms
+chat_db.general_schema> create table user_roles
+(
+role_id     serial primary key,
+role_name   varchar(50) unique not null,
+description text,
+priority    int
+)
+[2025-04-06 11:50:55] completed in 9 ms
+chat_db.general_schema> create table chat_roles
+(
+chat_id int not null,
+user_id int not null,
+role_id int not null,
+primary key (chat_id, user_id, role_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id),
+foreign key (role_id) references user_roles (role_id)
+)
+[2025-04-06 11:50:55] completed in 5 ms
+chat_db.general_schema> create table attachments
+(
+attachment_id serial primary key,
+message_id    int          not null,
+file_path     varchar(255) not null,
+file_type     varchar(50)  not null,
+file_size     int,
+uploaded_at   timestamp default current_timestamp,
+foreign key (message_id) references messages (message_id),
+constraint check_file_size check (file_size >= 0)
+)
+[2025-04-06 11:50:55] completed in 6 ms
+chat_db.general_schema> create table message_logs
+(
+log_id       serial primary key,
+message_id   int not null,
+recipient_id int references users (user_id),
+old_text     text,
+new_text     text,
+old_status   varchar(20),
+new_status   varchar(20),
+changed_at   timestamp default current_timestamp
+)
+[2025-04-06 11:50:55] completed in 8 ms
+chat_db.general_schema> create index idx_user_login on users (login)
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create index idx_messages_sent_at on messages (sent_at)
+[2025-04-06 11:50:55] completed in 4 ms
+chat_db.general_schema> create index idx_messages_chat_id on messages (chat_id)
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create index idx_chat_participants_user_id on chat_participants (user_id)
+[2025-04-06 11:50:55] completed in 2 ms
+chat_db.general_schema> create index idx_message_recipients_message_id on message_recipients (message_id)
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create or replace function register_user(
+p_login varchar,
+p_password varchar,
+p_name varchar
+)
+returns void as
+$$
+declare
+v_salt          varchar(255);
+v_password_hash varchar(512);
+begin
+if exists(select 1 from users where login = p_login) then
+raise exception 'Логин уже существует: %', p_login;
+end if;
+v_salt := gen_salt('bf');
+v_password_hash := crypt(p_password, v_salt);
+insert into users (login, password_hash, name, salt)
+values (p_login, v_password_hash, p_name, v_salt);
+end;
+$$ language plpgsql
+[2025-04-06 11:50:55] completed in 2 ms
+chat_db.general_schema> create or replace procedure send_message(
+p_chat_id int,
+p_sender_id int,
+p_message_text text,
+p_recipient_ids int[]
+)
+language plpgsql
+as
+$$
+declare
+v_message_id int;
+recipient    int;
+begin
+if not exists (select 1
+from chat_participants
+where chat_id = p_chat_id
+and user_id = p_sender_id) then
+raise exception 'Отправитель % не является участником чата %', p_sender_id, p_chat_id;
+end if;
+foreach recipient in array p_recipient_ids
+loop
+if not exists (select 1
+from chat_participants
+where chat_id = p_chat_id
+and user_id = recipient) then
+raise exception 'Получатель % не является участником чата %', recipient, p_chat_id;
+end if;
+end loop;
+insert into messages (chat_id, sender_id, message_text)
+values (p_chat_id, p_sender_id, p_message_text)
+returning message_id into v_message_id;
+foreach recipient in array p_recipient_ids
+loop
+insert into message_recipients (message_id, recipient_id, status)
+values (v_message_id, recipient, 'отправлено');
+end loop;
+end;
+$$
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create or replace function update_updated_at_column()
+returns trigger as
+$$
+begin
+new.update_at = current_timestamp;
+return new;
+end;
+$$ language plpgsql
+[2025-04-06 11:50:55] completed in 2 ms
+chat_db.general_schema> create trigger update_users_updated_at
+before update
+on users
+for each row
+execute function update_updated_at_column()
+[2025-04-06 11:50:55] completed in 1 ms
+chat_db.general_schema> create or replace function log_messages_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, old_text, new_text, changed_at)
+values (old.message_id, old.message_text, new.message_text, current_timestamp);
+return new;
+end;
+$$ language plpgsql
+[2025-04-06 11:50:55] completed in 1 ms
+chat_db.general_schema> create trigger log_messages_changes
+after update
+on messages
+for each row
+when (old.message_text is distinct from new.message_text)
+execute function log_messages_changes()
+[2025-04-06 11:50:56] completed in 2 ms
+chat_db.general_schema> create or replace function log_message_recipients_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, recipient_id, old_status, new_status, changed_at)
+values (old.message_id, old.recipient_id, old.status, new.status, current_timestamp);
+return new;
+end;
+$$ language plpgsql
+[2025-04-06 11:50:56] completed in 1 ms
+chat_db.general_schema> create trigger log_message_recipients_changes
+after update
+on message_recipients
+for each row
+when (old.status is distinct from new.status)
+execute function log_message_recipients_changes()
+[2025-04-06 11:50:56] completed in 2 ms
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_2\backUp\general_schema.md -----
+classDiagram
+direction BT
+class attachments {
+integer message_id
+varchar(255) file_path
+varchar(50) file_type
+integer file_size
+timestamp uploaded_at
+integer attachment_id
+}
+class chat_participants {
+timestamp joined_at
+integer chat_id
+integer user_id
+}
+class chat_roles {
+integer chat_id
+integer user_id
+integer role_id
+}
+class chats {
+varchar(10) chat_type
+varchar(100) chat_name
+text description
+timestamp created_at
+integer chat_id
+}
+class message_logs {
+integer message_id
+integer recipient_id
+text old_text
+text new_text
+varchar(20) old_status
+varchar(20) new_status
+timestamp changed_at
+integer log_id
+}
+class message_recipients {
+varchar(20) status
+integer message_id
+integer recipient_id
+}
+class messages {
+integer chat_id
+integer sender_id
+text message_text
+timestamp sent_at
+boolean edited
+integer message_id
+}
+class user_roles {
+varchar(50) role_name
+text description
+integer priority
+integer role_id
+}
+class users {
+varchar(50) login
+varchar(512) password_hash
+varchar(100) name
+timestamp created_at
+timestamp update_at
+varchar(255) salt
+integer user_id
+}
+attachments  -->  messages : message_id
+chat_participants  -->  chats : chat_id
+chat_participants  -->  users : user_id
+chat_roles  -->  chats : chat_id
+chat_roles  -->  user_roles : role_id
+chat_roles  -->  users : user_id
+message_logs  -->  users : recipient_id:user_id
+message_recipients  -->  messages : message_id
+message_recipients  -->  users : recipient_id:user_id
+messages  -->  chats : chat_id
+messages  -->  users : sender_id:user_id
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_2\backUp\script.sql -----
+create extension if not exists pgcrypto;
+create table users
+(
+user_id       serial primary key,
+login         varchar(50) unique not null,
+password_hash varchar(512)       not null,
+name          varchar(100)       not null,
+created_at    timestamp default current_timestamp,
+update_at     timestamp default current_timestamp,
+salt          varchar(255)
+);
+create table chats
+(
+chat_id     serial primary key,
+chat_type   varchar(10) not null check (chat_type in ('личный', 'групповой')),
+chat_name   varchar(100),
+description text,
+created_at  timestamp default current_timestamp
+);
+create table chat_participants
+(
+chat_id   int not null,
+user_id   int not null,
+joined_at timestamp default current_timestamp,
+primary key (chat_id, user_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id)
+);
+create table messages
+(
+message_id   serial primary key,
+chat_id      int  not null,
+sender_id    int  not null,
+message_text text not null,
+sent_at      timestamp default current_timestamp,
+edited       boolean   default false,
+foreign key (chat_id) references chats (chat_id),
+foreign key (sender_id) references users (user_id)
+);
+create table message_recipients
+(
+message_id   int         not null,
+recipient_id int         not null,
+status       varchar(20) not null check (status in ('отправлено', 'доставлено', 'прочитано')),
+primary key (message_id, recipient_id),
+foreign key (message_id) references messages (message_id),
+foreign key (recipient_id) references users (user_id)
+);
+create table user_roles
+(
+role_id     serial primary key,
+role_name   varchar(50) unique not null,
+description text,
+priority    int
+);
+create table chat_roles
+(
+chat_id int not null,
+user_id int not null,
+role_id int not null,
+primary key (chat_id, user_id, role_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id),
+foreign key (role_id) references user_roles (role_id)
+);
+create table attachments
+(
+attachment_id serial primary key,
+message_id    int          not null,
+file_path     varchar(255) not null,
+file_type     varchar(50)  not null,
+file_size     int,
+uploaded_at   timestamp default current_timestamp,
+foreign key (message_id) references messages (message_id),
+constraint check_file_size check (file_size >= 0)
+);
+create table message_logs
+(
+log_id       serial primary key,
+message_id   int not null,
+recipient_id int references users (user_id),
+old_text     text,
+new_text     text,
+old_status   varchar(20),
+new_status   varchar(20),
+changed_at   timestamp default current_timestamp
+);
+create index idx_user_login on users (login);
+create index idx_messages_sent_at on messages (sent_at);
+create index idx_messages_chat_id on messages (chat_id);
+create index idx_chat_participants_user_id on chat_participants (user_id);
+create index idx_message_recipients_message_id on message_recipients (message_id);
+create or replace function register_user(
+p_login varchar,
+p_password varchar,
+p_name varchar
+)
+returns void as
+$$
+declare
+v_salt          varchar(255);
+v_password_hash varchar(512);
+begin
+if exists(select 1 from users where login = p_login) then
+raise exception 'Логин уже существует: %', p_login;
+end if;
+v_salt := gen_salt('bf');
+v_password_hash := crypt(p_password, v_salt);
+insert into users (login, password_hash, name, salt)
+values (p_login, v_password_hash, p_name, v_salt);
+end;
+$$ language plpgsql;
+create or replace procedure send_message(
+p_chat_id int,
+p_sender_id int,
+p_message_text text,
+p_recipient_ids int[]
+)
+language plpgsql
+as
+$$
+declare
+v_message_id int;
+recipient    int;
+begin
+if not exists (select 1
+from chat_participants
+where chat_id = p_chat_id
+and user_id = p_sender_id) then
+raise exception 'Отправитель % не является участником чата %', p_sender_id, p_chat_id;
+end if;
+foreach recipient in array p_recipient_ids
+loop
+if not exists (select 1
+from chat_participants
+where chat_id = p_chat_id
+and user_id = recipient) then
+raise exception 'Получатель % не является участником чата %', recipient, p_chat_id;
+end if;
+end loop;
+insert into messages (chat_id, sender_id, message_text)
+values (p_chat_id, p_sender_id, p_message_text)
+returning message_id into v_message_id;
+foreach recipient in array p_recipient_ids
+loop
+insert into message_recipients (message_id, recipient_id, status)
+values (v_message_id, recipient, 'отправлено');
+end loop;
+end;
+$$;
+create or replace function update_updated_at_column()
+returns trigger as
+$$
+begin
+new.update_at = current_timestamp;
+return new;
+end;
+$$ language plpgsql;
+create trigger update_users_updated_at
+before update
+on users
+for each row
+execute function update_updated_at_column();
+create or replace function log_messages_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, old_text, new_text, changed_at)
+values (old.message_id, old.message_text, new.message_text, current_timestamp);
+return new;
+end;
+$$ language plpgsql;
+create trigger log_messages_changes
+after update
+on messages
+for each row
+when (old.message_text is distinct from new.message_text)
+execute function log_messages_changes();
+create or replace function log_message_recipients_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, recipient_id, old_status, new_status, changed_at)
+values (old.message_id, old.recipient_id, old.status, new.status, current_timestamp);
+return new;
+end;
+$$ language plpgsql;
+create trigger log_message_recipients_changes
+after update
+on message_recipients
+for each row
+when (old.status is distinct from new.status)
+execute function log_message_recipients_changes();
+----- Файл: C:\Users\dim4d\OneDrive\Рабочий стол\console-cpp-chat-25xx\db\SQLStorage\v_2\backUp\testShemaConsoleLogs.txt -----
+[2025-04-06 11:50:19] completed in 4 ms
+chat_db.general_schema> create extension if not exists pgcrypto
+[2025-04-06 11:50:37] completed in 6 ms
+chat_db.general_schema> create table users
+(
+user_id       serial primary key,
+login         varchar(50) unique not null,
+password_hash varchar(512)       not null,
+name          varchar(100)       not null,
+created_at    timestamp default current_timestamp,
+update_at     timestamp default current_timestamp,
+salt          varchar(255)
+)
+[2025-04-06 11:50:55] completed in 44 ms
+chat_db.general_schema> create table chats
+(
+chat_id     serial primary key,
+chat_type   varchar(10) not null check (chat_type in ('личный', 'групповой')),
+chat_name   varchar(100),
+description text,
+created_at  timestamp default current_timestamp
+)
+[2025-04-06 11:50:55] completed in 9 ms
+chat_db.general_schema> create table chat_participants
+(
+chat_id   int not null,
+user_id   int not null,
+joined_at timestamp default current_timestamp,
+primary key (chat_id, user_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id)
+)
+[2025-04-06 11:50:55] completed in 5 ms
+chat_db.general_schema> create table messages
+(
+message_id   serial primary key,
+chat_id      int  not null,
+sender_id    int  not null,
+message_text text not null,
+sent_at      timestamp default current_timestamp,
+edited       boolean   default false,
+foreign key (chat_id) references chats (chat_id),
+foreign key (sender_id) references users (user_id)
+)
+[2025-04-06 11:50:55] completed in 9 ms
+chat_db.general_schema> create table message_recipients
+(
+message_id   int         not null,
+recipient_id int         not null,
+status       varchar(20) not null check (status in ('отправлено', 'доставлено', 'прочитано')),
+primary key (message_id, recipient_id),
+foreign key (message_id) references messages (message_id),
+foreign key (recipient_id) references users (user_id)
+)
+[2025-04-06 11:50:55] completed in 6 ms
+chat_db.general_schema> create table user_roles
+(
+role_id     serial primary key,
+role_name   varchar(50) unique not null,
+description text,
+priority    int
+)
+[2025-04-06 11:50:55] completed in 9 ms
+chat_db.general_schema> create table chat_roles
+(
+chat_id int not null,
+user_id int not null,
+role_id int not null,
+primary key (chat_id, user_id, role_id),
+foreign key (chat_id) references chats (chat_id),
+foreign key (user_id) references users (user_id),
+foreign key (role_id) references user_roles (role_id)
+)
+[2025-04-06 11:50:55] completed in 5 ms
+chat_db.general_schema> create table attachments
+(
+attachment_id serial primary key,
+message_id    int          not null,
+file_path     varchar(255) not null,
+file_type     varchar(50)  not null,
+file_size     int,
+uploaded_at   timestamp default current_timestamp,
+foreign key (message_id) references messages (message_id),
+constraint check_file_size check (file_size >= 0)
+)
+[2025-04-06 11:50:55] completed in 6 ms
+chat_db.general_schema> create table message_logs
+(
+log_id       serial primary key,
+message_id   int not null,
+recipient_id int references users (user_id),
+old_text     text,
+new_text     text,
+old_status   varchar(20),
+new_status   varchar(20),
+changed_at   timestamp default current_timestamp
+)
+[2025-04-06 11:50:55] completed in 8 ms
+chat_db.general_schema> create index idx_user_login on users (login)
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create index idx_messages_sent_at on messages (sent_at)
+[2025-04-06 11:50:55] completed in 4 ms
+chat_db.general_schema> create index idx_messages_chat_id on messages (chat_id)
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create index idx_chat_participants_user_id on chat_participants (user_id)
+[2025-04-06 11:50:55] completed in 2 ms
+chat_db.general_schema> create index idx_message_recipients_message_id on message_recipients (message_id)
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create or replace function register_user(
+p_login varchar,
+p_password varchar,
+p_name varchar
+)
+returns void as
+$$
+declare
+v_salt          varchar(255);
+v_password_hash varchar(512);
+begin
+if exists(select 1 from users where login = p_login) then
+raise exception 'Логин уже существует: %', p_login;
+end if;
+v_salt := gen_salt('bf');
+v_password_hash := crypt(p_password, v_salt);
+insert into users (login, password_hash, name, salt)
+values (p_login, v_password_hash, p_name, v_salt);
+end;
+$$ language plpgsql
+[2025-04-06 11:50:55] completed in 2 ms
+chat_db.general_schema> create or replace procedure send_message(
+p_chat_id int,
+p_sender_id int,
+p_message_text text,
+p_recipient_ids int[]
+)
+language plpgsql
+as
+$$
+declare
+v_message_id int;
+recipient    int;
+begin
+if not exists (select 1
+from chat_participants
+where chat_id = p_chat_id
+and user_id = p_sender_id) then
+raise exception 'Отправитель % не является участником чата %', p_sender_id, p_chat_id;
+end if;
+foreach recipient in array p_recipient_ids
+loop
+if not exists (select 1
+from chat_participants
+where chat_id = p_chat_id
+and user_id = recipient) then
+raise exception 'Получатель % не является участником чата %', recipient, p_chat_id;
+end if;
+end loop;
+insert into messages (chat_id, sender_id, message_text)
+values (p_chat_id, p_sender_id, p_message_text)
+returning message_id into v_message_id;
+foreach recipient in array p_recipient_ids
+loop
+insert into message_recipients (message_id, recipient_id, status)
+values (v_message_id, recipient, 'отправлено');
+end loop;
+end;
+$$
+[2025-04-06 11:50:55] completed in 3 ms
+chat_db.general_schema> create or replace function update_updated_at_column()
+returns trigger as
+$$
+begin
+new.update_at = current_timestamp;
+return new;
+end;
+$$ language plpgsql
+[2025-04-06 11:50:55] completed in 2 ms
+chat_db.general_schema> create trigger update_users_updated_at
+before update
+on users
+for each row
+execute function update_updated_at_column()
+[2025-04-06 11:50:55] completed in 1 ms
+chat_db.general_schema> create or replace function log_messages_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, old_text, new_text, changed_at)
+values (old.message_id, old.message_text, new.message_text, current_timestamp);
+return new;
+end;
+$$ language plpgsql
+[2025-04-06 11:50:55] completed in 1 ms
+chat_db.general_schema> create trigger log_messages_changes
+after update
+on messages
+for each row
+when (old.message_text is distinct from new.message_text)
+execute function log_messages_changes()
+[2025-04-06 11:50:56] completed in 2 ms
+chat_db.general_schema> create or replace function log_message_recipients_changes()
+returns trigger as
+$$
+begin
+insert into message_logs (message_id, recipient_id, old_status, new_status, changed_at)
+values (old.message_id, old.recipient_id, old.status, new.status, current_timestamp);
+return new;
+end;
+$$ language plpgsql
+[2025-04-06 11:50:56] completed in 1 ms
+chat_db.general_schema> create trigger log_message_recipients_changes
+after update
+on message_recipients
+for each row
+when (old.status is distinct from new.status)
+execute function log_message_recipients_changes()
+[2025-04-06 11:50:56] completed in 2 ms
+chat_db.general_schema> select register_user('dima_228', 'SuperSecret1', 'Дима Приходько')
+[2025-04-06 12:17:45] 1 row retrieved starting from 1 in 309 ms (execution: 19 ms, fetching: 290 ms)
+chat_db.general_schema> select register_user('micha_228', 'UltraSecret2', 'Миша Денисов')
+[2025-04-06 12:17:45] 1 row retrieved starting from 1 in 414 ms (execution: 13 ms, fetching: 401 ms)
+chat_db.general_schema> select *
+from users
+[2025-04-06 12:18:41] 2 rows retrieved starting from 1 in 232 ms (execution: 12 ms, fetching: 220 ms)
+chat_db.general_schema> insert into chats (chat_type, chat_name, description)
+values ('групповой', 'Проект "Будущее"', 'Обсуждение всех идей для завтрашнего дня')
+[2025-04-06 12:20:00] 1 row affected in 6 ms
+chat_db.general_schema> insert into chat_participants (chat_id, user_id)
+values (1, 1),
+(1, 2)
+[2025-04-06 12:20:00] 2 rows affected in 6 ms
+chat_db.general_schema> select * from chats
+[2025-04-06 12:20:36] 1 row retrieved starting from 1 in 323 ms (execution: 5 ms, fetching: 318 ms)
+chat_db.general_schema> select * from chat_participants
+[2025-04-06 12:20:37] 2 rows retrieved starting from 1 in 401 ms (execution: 6 ms, fetching: 395 ms)
+chat_db.general_schema> call send_message(
+p_chat_id := 1,
+p_sender_id := 1,
+p_message_text := 'Привет, человеки!',
+p_recipient_ids := array [2]
+)
+[2025-04-06 12:22:12] completed in 9 ms
+chat_db.general_schema> select *
+from messages
+[2025-04-06 12:22:40] 1 row retrieved starting from 1 in 365 ms (execution: 5 ms, fetching: 360 ms)
+chat_db.general_schema> select *
+from message_recipients
+[2025-04-06 12:22:40] 1 row retrieved starting from 1 in 399 ms (execution: 4 ms, fetching: 395 ms)
+chat_db.general_schema> update users
+set name = 'Иван Крутой'
+where user_id = 1
+[2025-04-06 12:23:04] 1 row affected in 12 ms
+chat_db.general_schema> select * from users
+[2025-04-06 12:23:11] 2 rows retrieved starting from 1 in 141 ms (execution: 2 ms, fetching: 139 ms)
+chat_db.general_schema> select * from message_recipients
+[2025-04-06 12:23:12] 1 row retrieved starting from 1 in 329 ms (execution: 6 ms, fetching: 323 ms)
+chat_db.general_schema> update messages
+set message_text = 'Привет, чулувеки! Хотите шутку ?'
+where message_id = 1
+[2025-04-06 12:24:15] 1 row affected in 5 ms
+chat_db.general_schema> update message_recipients
+set status = 'доставлено'
+where message_id = 1 and recipient_id = 2
+[2025-04-06 12:24:42] 1 row affected in 3 ms
+chat_db.general_schema> select * from message_logs
+[2025-04-06 12:25:07] 2 rows retrieved starting from 1 in 247 ms (execution: 5 ms, fetching: 242 ms)
+chat_db.general_schema> insert into attachments (message_id, file_path, file_type, file_size)
+values (1, '/files/prices.pdf', 'orders/pdf', 22 * 1024)
+[2025-04-06 12:26:57] 1 row affected in 4 ms
+chat_db.general_schema> select * from attachments
+[2025-04-06 12:27:17] 1 row retrieved starting from 1 in 188 ms (execution: 3 ms, fetching: 185 ms)
+chat_db.general_schema> delete
+from message_logs
+where message_id = 1
+[2025-04-06 12:35:11] 2 rows affected in 2 ms
+chat_db.general_schema> delete
+from message_recipients
+where message_id = 1
+[2025-04-06 12:35:11] 1 row affected in 2 ms
+chat_db.general_schema> delete
+from messages
+where message_id = 1
+[2025-04-06 12:35:11] [23503] ОШИБКА: UPDATE или DELETE в таблице "messages" нарушает ограничение внешнего ключа "attachments_message_id_fkey" таблицы "attachments"
+[2025-04-06 12:35:11] Detail: На ключ (message_id)=(1) всё ещё есть ссылки в таблице "attachments".
+chat_db.general_schema> select * from users
+[2025-04-06 12:36:38] 2 rows retrieved starting from 1 in 211 ms (execution: 4 ms, fetching: 207 ms)
+chat_db.general_schema> select * from users where login = 'dima_228'
+[2025-04-06 12:36:53] 1 row retrieved starting from 1 in 310 ms (execution: 4 ms, fetching: 306 ms)
+chat_db.general_schema> select * from messages where chat_id = 1 order by sent_at desc
+[2025-04-06 12:37:03] 1 row retrieved starting from 1 in 110 ms (execution: 5 ms, fetching: 105 ms)
