@@ -27,5 +27,3 @@ int main(int argc, const char **argv)
     client_socket(server_address.data(), port.data());
     return 0;
 }
-// ^\s*\n
-// ^\s+(?=\S)
