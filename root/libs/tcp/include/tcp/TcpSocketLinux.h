@@ -1,9 +1,13 @@
+#pragma once
 #if !defined(_WIN32)
+#include "tcp/ISocket.h"
+#include <string>
+#include <cstddef>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#endif
+#include <sys/types.h>
 namespace tcp
 {
     class TcpSocketLinux : public ISocket
@@ -20,3 +24,4 @@ namespace tcp
         int sockfd_;
     };
 }
+#endif
