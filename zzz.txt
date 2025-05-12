@@ -1,0 +1,649 @@
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp_config.h -----
+#pragma once
+static constexpr int TCP_DEFAULT_PORT = 8080;
+static constexpr int TCP_BUFFER_SIZE = 1024;
+static constexpr int TCP_MAX_PENDING = 5;
+static constexpr int TCP_CONNECT_TIMEOUT_SEC = 5;
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp\ISocket.h -----
+#pragma once
+#include <string>
+#include <cstddef>
+namespace tcp
+{
+class ISocket
+{
+public:
+virtual ~ISocket() = default;
+virtual bool connect(const std::string &host, int port) = 0;
+virtual std::size_t send(const char *data, std::size_t length) = 0;
+virtual std::size_t receive(char *buffer, std::size_t maxlen) = 0;
+virtual void close() = 0;
+};
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp\TcpSocketLinux.h -----
+#pragma once
+#if !defined(_WIN32)
+#include "tcp/ISocket.h"
+#include <string>
+#include <cstddef>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <sys/types.h>
+namespace tcp
+{
+class TcpSocketLinux : public ISocket
+{
+public:
+TcpSocketLinux();
+~TcpSocketLinux() override;
+bool connect(const std::string &host, int port) override;
+std::size_t send(const char *data, std::size_t length) override;
+std::size_t receive(char *buffer, std::size_t maxlen) override;
+void close() override;
+private:
+int sockfd_;
+};
+}
+#endif
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp\TcpSocketWin.h -----
+#pragma once
+#include "tcp/ISocket.h"
+#if defined(_WIN32)
+#undef UNICODE
+#undef _UNICODE
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32")
+#endif
+namespace tcp
+{
+class TcpSocketWin : public ISocket
+{
+public:
+TcpSocketWin();
+~TcpSocketWin() override;
+bool connect(const std::string &host, int port) override;
+std::size_t send(const char *data, std::size_t length) override;
+std::size_t receive(char *buffer, std::size_t maxlen) override;
+void close() override;
+private:
+#if defined(_WIN32)
+SOCKET sock_ = INVALID_SOCKET;
+bool initialized_ = false;
+#endif
+};
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\src\SocketFactory.cpp -----
+#include "tcp/ISocket.h"
+#include "tcp/TcpSocketLinux.h"
+#include "tcp/TcpSocketWin.h"
+#include <memory>
+namespace tcp
+{
+std::unique_ptr<ISocket> createSocket()
+{
+#if defined(_WIN32)
+return std::make_unique<TcpSocketWin>();
+#else
+return std::make_unique<TcpSocketLinux>();
+#endif
+}
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\src\TcpSocketLinux.cpp -----
+#if !defined(_WIN32)
+#include "tcp/TcpSocketLinux.h"
+#include <cstring>
+#include <stdexcept>
+namespace tcp
+{
+TcpSocketLinux::TcpSocketLinux() : sockfd_(-1) {}
+TcpSocketLinux::~TcpSocketLinux()
+{
+close();
+}
+bool TcpSocketLinux::connect(const std::string &host, int port)
+{
+if (sockfd_ != -1)
+{
+this->close();
+}
+sockfd_ = ::socket(AF_INET, SOCK_STREAM, 0);
+if (sockfd_ < 0)
+{
+return false;
+}
+#if defined(__APPLE__) || defined(__FreeBSD__)
+int set = 1;
+if (setsockopt(sockfd_, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int)) == -1)
+{
+::close(sockfd_);
+sockfd_ = -1;
+return false;
+}
+#endif
+sockaddr_in addr;
+std::memset(&addr, 0, sizeof(addr));
+addr.sin_family = AF_INET;
+addr.sin_port = htons(static_cast<uint16_t>(port));
+if (::inet_pton(AF_INET, host.c_str(), &addr.sin_addr) <= 0)
+{
+::close(sockfd_);
+sockfd_ = -1;
+return false;
+}
+if (::connect(sockfd_, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0)
+{
+::close(sockfd_);
+sockfd_ = -1;
+return false;
+}
+return true;
+}
+std::size_t TcpSocketLinux::send(const char *data, std::size_t length)
+{
+if (sockfd_ < 0 || data == nullptr || length == 0)
+{
+return 0;
+}
+ssize_t bytes_sent = ::send(sockfd_, data, length, 0);
+if (bytes_sent < 0)
+{
+return 0;
+}
+return static_cast<std::size_t>(bytes_sent);
+}
+std::size_t TcpSocketLinux::receive(char *buffer, std::size_t maxlen)
+{
+if (sockfd_ < 0 || buffer == nullptr || maxlen == 0)
+{
+return 0;
+}
+ssize_t bytes_received = ::recv(sockfd_, buffer, maxlen, 0);
+if (bytes_received < 0)
+{
+return 0;
+}
+return static_cast<std::size_t>(bytes_received);
+}
+void TcpSocketLinux::close()
+{
+if (sockfd_ >= 0)
+{
+if (::shutdown(sockfd_, SHUT_RDWR) < 0)
+{
+}
+::close(sockfd_);
+sockfd_ = -1;
+}
+}
+}
+#endif
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\src\TcpSocketWin.cpp -----
+#if defined(_WIN32)
+#include "tcp/TcpSocketWin.h"
+#include <stdexcept>
+namespace tcp
+{
+TcpSocketWin::TcpSocketWin() : sock_(INVALID_SOCKET), initialized_(false)
+{
+WSADATA wsaData;
+if (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0)
+{
+initialized_ = true;
+}
+else
+{
+}
+}
+TcpSocketWin::~TcpSocketWin()
+{
+this->close();
+if (initialized_)
+{
+WSACleanup();
+}
+}
+bool TcpSocketWin::connect(const std::string &host, int port)
+{
+if (!initialized_)
+{
+return false;
+}
+if (sock_ != INVALID_SOCKET)
+{
+this->close();
+}
+sock_ = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+if (sock_ == INVALID_SOCKET)
+{
+return false;
+}
+sockaddr_in addr = {};
+addr.sin_family = AF_INET;
+addr.sin_port = htons(static_cast<USHORT>(port));
+if (::InetPtonA(AF_INET, host.c_str(), &addr.sin_addr) != 1)
+{
+::closesocket(sock_);
+sock_ = INVALID_SOCKET;
+return false;
+}
+if (::connect(sock_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == SOCKET_ERROR)
+{
+::closesocket(sock_);
+sock_ = INVALID_SOCKET;
+return false;
+}
+return true;
+}
+std::size_t TcpSocketWin::send(const char *data, std::size_t length)
+{
+if (sock_ == INVALID_SOCKET || !initialized_ || data == nullptr || length == 0)
+{
+return 0;
+}
+if (length > static_cast<std::size_t>(INT_MAX))
+{
+return 0;
+}
+int bytes_sent = ::send(sock_, data, static_cast<int>(length), 0);
+if (bytes_sent == SOCKET_ERROR)
+{
+return 0;
+}
+return static_cast<std::size_t>(bytes_sent);
+}
+std::size_t TcpSocketWin::receive(char *buffer, std::size_t maxlen)
+{
+if (sock_ == INVALID_SOCKET || !initialized_ || buffer == nullptr || maxlen == 0)
+{
+return 0;
+}
+if (maxlen > static_cast<std::size_t>(INT_MAX))
+{
+return 0;
+}
+int bytes_received = ::recv(sock_, buffer, static_cast<int>(maxlen), 0);
+if (bytes_received == SOCKET_ERROR)
+{
+return 0;
+}
+return static_cast<std::size_t>(bytes_received);
+}
+void TcpSocketWin::close()
+{
+if (sock_ != INVALID_SOCKET)
+{
+if (::shutdown(sock_, SD_BOTH) == SOCKET_ERROR)
+{
+}
+::closesocket(sock_);
+sock_ = INVALID_SOCKET;
+}
+}
+}
+#endif
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\client\include\Client.h -----
+#pragma once
+#include <string>
+#include <memory>
+#include <thread>
+#include "tcp/ISocket.h"
+class Client
+{
+public:
+Client(const std::string &host, unsigned short port);
+~Client();
+void run();
+private:
+void connectToServer();
+void login();
+void sendMessage();
+void receiveLoop();
+std::unique_ptr<tcp::ISocket> socket_;
+std::thread recvThread_;
+bool running_{false};
+std::string serverHost_;
+unsigned short serverPort_;
+std::string currentUser_;
+};
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\client\include\UI.h -----
+#pragma once
+#include <string>
+namespace UI
+{
+char showLoginMenu();
+char showUserMenu(const std::string &currentUserName);
+std::string promptLogin();
+std::string promptMessage();
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\client\src\Client.cpp -----
+#include "Client.h"
+#include "UI.h"
+#include "tcp/SocketFactory.h"
+#include "tcp_config.h"
+#include <iostream>
+#include <vector>
+#include <sstream>
+Client::Client(const std::string &host, unsigned short port)
+: serverHost_(host), serverPort_(port), socket_(nullptr), running_(false), currentUser_("") {}
+Client::~Client()
+{
+running_ = false;
+if (socket_)
+{
+socket_->close();
+}
+if (recvThread_.joinable())
+{
+recvThread_.join();
+}
+std::cout << "Клиент завершил работу.\n";
+}
+void Client::connectToServer()
+{
+socket_ = tcp::createSocket();
+if (!socket_)
+{
+std::cerr << "Ошибка: Не удалось создать объект сокета.\n";
+running_ = false;
+return;
+}
+std::cout << "Попытка подключения к " << serverHost_ << ":" << serverPort_ << "...\n";
+if (!socket_->connect(serverHost_, serverPort_))
+{
+std::cerr << "Ошибка: Не удалось подключиться к серверу.\n";
+socket_.reset();
+running_ = false;
+return;
+}
+std::cout << "Успешно подключено к серверу.\n";
+running_ = true;
+}
+void Client::login()
+{
+if (!socket_ || !running_)
+{
+std::cerr << "Не подключено к серверу. Вход невозможен.\n";
+return;
+}
+auto creds_str = UI::promptLogin();
+if (creds_str.empty())
+{
+std::cout << "Вход отменен.\n";
+return;
+}
+std::string login_packet = "LOGIN " + creds_str + "\n";
+std::size_t sent_bytes = socket_->send(login_packet.c_str(), login_packet.length());
+if (sent_bytes != login_packet.length())
+{
+std::cerr << "Ошибка отправки данных для входа.\n";
+running_ = false;
+return;
+}
+char buffer[TCP_BUFFER_SIZE];
+std::size_t received = socket_->receive(buffer, TCP_BUFFER_SIZE - 1);
+if (received > 0)
+{
+buffer[received] = '\0';
+std::string response(buffer);
+if (response.find("LOGIN_OK") != std::string::npos)
+{
+size_t space_pos = creds_str.find(' ');
+if (space_pos != std::string::npos)
+{
+currentUser_ = creds_str.substr(0, space_pos);
+}
+else
+{
+currentUser_ = creds_str;
+}
+std::cout << "Вход успешен для пользователя: " << currentUser_ << "\n";
+}
+else
+{
+std::cerr << "Ошибка входа: " << response << "\n";
+}
+}
+else
+{
+std::cerr << "Ошибка получения ответа от сервера.\n";
+running_ = false;
+}
+}
+void Client::sendMessage()
+{
+if (!socket_ || !running_ || currentUser_.empty())
+{
+std::cerr << "Не подключено к серверу или не выполнен вход.\n";
+return;
+}
+std::string message = UI::promptMessage();
+if (message.empty())
+{
+std::cout << "Сообщение не отправлено.\n";
+return;
+}
+std::string packet = "MESSAGE " + currentUser_ + " " + message + "\n";
+std::size_t sent_bytes = socket_->send(packet.c_str(), packet.length());
+if (sent_bytes != packet.length())
+{
+std::cerr << "Ошибка отправки сообщения.\n";
+running_ = false;
+}
+else
+{
+std::cout << "Сообщение отправлено.\n";
+}
+}
+void Client::receiveLoop()
+{
+while (running_)
+{
+char buffer[TCP_BUFFER_SIZE];
+std::size_t received = socket_->receive(buffer, TCP_BUFFER_SIZE - 1);
+if (received > 0)
+{
+buffer[received] = '\0';
+std::cout << "Получено: " << buffer << "\n";
+}
+else if (received == 0)
+{
+std::cout << "Сервер закрыл соединение.\n";
+running_ = false;
+break;
+}
+else
+{
+std::cerr << "Ошибка при получении данных.\n";
+running_ = false;
+break;
+}
+}
+}
+void Client::run()
+{
+connectToServer();
+if (!running_)
+{
+return;
+}
+recvThread_ = std::thread(&Client::receiveLoop, this);
+while (running_)
+{
+if (currentUser_.empty())
+{
+char cmd = UI::showLoginMenu();
+if (cmd == 'l')
+{
+login();
+}
+else if (cmd == 'q')
+{
+running_ = false;
+}
+else
+{
+std::cout << "Неверный ввод.\n";
+}
+}
+else
+{
+char cmd = UI::showUserMenu(currentUser_);
+if (cmd == 's')
+{
+sendMessage();
+}
+else if (cmd == 'o')
+{
+currentUser_ = "";
+std::cout << "Выход из аккаунта.\n";
+}
+else
+{
+std::cout << "Неверный ввод.\n";
+}
+}
+}
+if (recvThread_.joinable())
+{
+recvThread_.join();
+}
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\client\src\main.cpp -----
+#include "Client.h"
+#include <iostream>
+#include <string>
+#include <stdexcept>
+int main(int argc, char *argv[])
+{
+if (argc != 2)
+{
+std::cerr << "Использование: chat_client <хост:порт>\n";
+return 1;
+}
+std::string arg = argv[1];
+size_t pos = arg.find(':');
+if (pos == std::string::npos)
+{
+std::cerr << "Ошибка: Неверный формат аргумента. Используйте <хост:порт>.\n";
+return 1;
+}
+std::string host = arg.substr(0, pos);
+std::string port_str = arg.substr(pos + 1);
+if (host.empty())
+{
+std::cerr << "Ошибка: Имя хоста не может быть пустым.\n";
+return 1;
+}
+if (port_str.empty())
+{
+std::cerr << "Ошибка: Порт не может быть пустым.\n";
+return 1;
+}
+unsigned short port = 0;
+try
+{
+int p_int = std::stoi(port_str);
+if (p_int <= 0 || p_int > 65535)
+{
+std::cerr << "Ошибка: Неверный номер порта: " << p_int << ". Порт должен быть в диапазоне 1-65535.\n";
+return 1;
+}
+port = static_cast<unsigned short>(p_int);
+}
+catch (const std::invalid_argument &ia)
+{
+std::cerr << "Ошибка: Неверный формат номера порта (не число): " << port_str << "\n";
+return 1;
+}
+catch (const std::out_of_range &oor)
+{
+std::cerr << "Ошибка: Номер порта вне допустимого диапазона: " << port_str << "\n";
+return 1;
+}
+try
+{
+Client client(host, port);
+client.run();
+}
+catch (const std::exception &e)
+{
+std::cerr << "Непредвиденная ошибка клиента: " << e.what() << std::endl;
+return 2;
+}
+catch (...)
+{
+std::cerr << "Непредвиденная неизвестная ошибка клиента." << std::endl;
+return 2;
+}
+return 0;
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\client\src\UI.cpp -----
+#include "UI.h"
+#include <iostream>
+#include <limits>
+#include <string>
+#include <cctype>
+namespace UI
+{
+char showLoginMenu()
+{
+std::cout << "[L]ogin, [Q]uit: ";
+char c;
+if (!(std::cin >> c))
+{
+std::cin.clear();
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+return '\0';
+}
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+}
+char showUserMenu(const std::string &currentUserName)
+{
+std::cout << "[" << currentUserName << "] [S]end message, [O]ut (logout): ";
+char c;
+if (!(std::cin >> c))
+{
+std::cin.clear();
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+return '\0';
+}
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+}
+std::string promptLogin()
+{
+std::string login, password;
+std::cout << "Login: ";
+if (!(std::cin >> login))
+{
+std::cin.clear();
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+return "";
+}
+std::cout << "Password: ";
+if (!(std::cin >> password))
+{
+std::cin.clear();
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+return "";
+}
+if (login.empty())
+return "";
+return login + " " + password;
+}
+std::string promptMessage()
+{
+std::cout << "Message: ";
+std::string msg;
+if (!std::getline(std::cin, msg))
+{
+std::cin.clear();
+return "";
+}
+return msg;
+}
+}

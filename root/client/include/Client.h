@@ -3,6 +3,7 @@
 #include <memory>
 #include <thread>
 #include "tcp/ISocket.h"
+
 class Client
 {
 public:
