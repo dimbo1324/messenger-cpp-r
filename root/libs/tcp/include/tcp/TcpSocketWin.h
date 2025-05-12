@@ -1,12 +1,16 @@
 #pragma once
 #include "tcp/ISocket.h"
 #if defined(_WIN32)
+#undef UNICODE
+#undef _UNICODE
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "ws2_32")
 #endif
+
 namespace tcp
 {
+
     class TcpSocketWin : public ISocket
     {
     public:
@@ -19,8 +23,9 @@ namespace tcp
 
     private:
 #if defined(_WIN32)
-        SOCKET sock_;
-        bool initialized_;
+        SOCKET sock_ = INVALID_SOCKET;
+        bool initialized_ = false;
 #endif
     };
+
 }

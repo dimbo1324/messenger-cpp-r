@@ -1,0 +1,188 @@
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp_config.h -----
+#pragma once
+static constexpr int TCP_DEFAULT_PORT = 8080;
+static constexpr int TCP_BUFFER_SIZE = 1024;
+static constexpr int TCP_MAX_PENDING = 5;
+static constexpr int TCP_CONNECT_TIMEOUT_SEC = 5;
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp\ISocket.h -----
+#pragma once
+#include <string>
+#include <cstddef>
+namespace tcp
+{
+class ISocket
+{
+public:
+virtual ~ISocket() = default;
+virtual bool connect(const std::string &host, int port) = 0;
+virtual std::size_t send(const char *data, std::size_t length) = 0;
+virtual std::size_t receive(char *buffer, std::size_t maxlen) = 0;
+virtual void close() = 0;
+};
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp\TcpSocketLinux.h -----
+#if !defined(_WIN32)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#endif
+namespace tcp
+{
+class TcpSocketLinux : public ISocket
+{
+public:
+TcpSocketLinux();
+~TcpSocketLinux() override;
+bool connect(const std::string &host, int port) override;
+std::size_t send(const char *data, std::size_t length) override;
+std::size_t receive(char *buffer, std::size_t maxlen) override;
+void close() override;
+private:
+int sockfd_;
+};
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\include\tcp\TcpSocketWin.h -----
+#pragma once
+#include "tcp/ISocket.h"
+#if defined(_WIN32)
+#undef UNICODE
+#undef _UNICODE
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32")
+#endif
+namespace tcp
+{
+class TcpSocketWin : public ISocket
+{
+public:
+TcpSocketWin();
+~TcpSocketWin() override;
+bool connect(const std::string &host, int port) override;
+std::size_t send(const char *data, std::size_t length) override;
+std::size_t receive(char *buffer, std::size_t maxlen) override;
+void close() override;
+private:
+#if defined(_WIN32)
+SOCKET sock_ = INVALID_SOCKET;
+bool initialized_ = false;
+#endif
+};
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\src\SocketFactory.cpp -----
+#include "tcp/ISocket.h"
+#include "tcp/TcpSocketLinux.h"
+#include "tcp/TcpSocketWin.h"
+#include <memory>
+namespace tcp
+{
+std::unique_ptr<ISocket> createSocket()
+{
+#if defined(_WIN32)
+return std::make_unique<TcpSocketWin>();
+#else
+return std::make_unique<TcpSocketLinux>();
+#endif
+}
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\src\TcpSocketLinux.cpp -----
+#include "tcp/ISocket.h"
+#include "tcp/TcpSocketLinux.h"
+#include <cstring>
+#include <stdexcept>
+namespace tcp
+{
+TcpSocketLinux::TcpSocketLinux() : sockfd_(-1) {}
+TcpSocketLinux::~TcpSocketLinux()
+{
+close();
+}
+bool TcpSocketLinux::connect(const std::string &host, int port)
+{
+sockfd_ = ::socket(AF_INET, SOCK_STREAM, 0);
+if (sockfd_ < 0)
+return false;
+sockaddr_in addr;
+std::memset(&addr, 0, sizeof(addr));
+addr.sin_family = AF_INET;
+addr.sin_port = htons(port);
+if (::inet_pton(AF_INET, host.c_str(), &addr.sin_addr) <= 0)
+return false;
+return (::connect(sockfd_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0);
+}
+std::size_t TcpSocketLinux::send(const char *data, std::size_t length)
+{
+return ::send(sockfd_, data, length, 0);
+}
+std::size_t TcpSocketLinux::receive(char *buffer, std::size_t maxlen)
+{
+ssize_t bytes = ::recv(sockfd_, buffer, static_cast<int>(maxlen), 0);
+return bytes > 0 ? static_cast<std::size_t>(bytes) : 0;
+}
+void TcpSocketLinux::close()
+{
+if (sockfd_ >= 0)
+{
+::shutdown(sockfd_, SHUT_RDWR);
+::close(sockfd_);
+sockfd_ = -1;
+}
+}
+}
+----- Файл: C:\Users\dim4d\Desktop\From git\1. C++ projects\Проект чата С++\c-plus-plus-messenger\root\libs\tcp\src\TcpSocketWin.cpp -----
+#include "tcp/TcpSocketWin.h"
+#include <stdexcept>
+namespace tcp
+{
+TcpSocketWin::TcpSocketWin()
+{
+WSADATA wsaData;
+if (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0)
+{
+initialized_ = true;
+}
+}
+TcpSocketWin::~TcpSocketWin()
+{
+close();
+if (initialized_)
+WSACleanup();
+}
+bool TcpSocketWin::connect(const std::string &host, int port)
+{
+if (!initialized_)
+return false;
+sock_ = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+if (sock_ == INVALID_SOCKET)
+return false;
+sockaddr_in addr = {};
+addr.sin_family = AF_INET;
+addr.sin_port = htons(port);
+if (::InetPtonA(AF_INET, host.c_str(), &addr.sin_addr) != 1)
+{
+closesocket(sock_);
+return false;
+}
+return (::connect(sock_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0);
+}
+std::size_t TcpSocketWin::send(const char *data, std::size_t length)
+{
+int res = ::send(sock_, data, static_cast<int>(length), 0);
+return res == SOCKET_ERROR ? 0 : static_cast<std::size_t>(res);
+}
+std::size_t TcpSocketWin::receive(char *buffer, std::size_t maxlen)
+{
+int rec = ::recv(sock_, buffer, static_cast<int>(maxlen), 0);
+return rec <= 0 ? 0 : static_cast<std::size_t>(rec);
+}
+void TcpSocketWin::close()
+{
+if (sock_ != INVALID_SOCKET)
+{
+::shutdown(sock_, SD_BOTH);
+::closesocket(sock_);
+sock_ = INVALID_SOCKET;
+}
+}
+}
