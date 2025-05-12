@@ -3,7 +3,6 @@
 #include <limits>
 #include <string>
 #include <cctype>
-
 namespace UI
 {
     char showLoginMenu()
@@ -19,7 +18,6 @@ namespace UI
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-
     char showUserMenu(const std::string &currentUserName)
     {
         std::cout << "[" << currentUserName << "] [S]end message, [O]ut (logout): ";
@@ -33,7 +31,6 @@ namespace UI
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-
     std::string promptLogin()
     {
         std::string login, password;
@@ -55,7 +52,6 @@ namespace UI
             return "";
         return login + " " + password;
     }
-
     std::string promptMessage()
     {
         std::cout << "Message: ";
