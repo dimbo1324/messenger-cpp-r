@@ -5,10 +5,8 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 #endif
-
 namespace tcp
 {
-
     class TcpSocketWin : public ISocket
     {
     public:
@@ -25,5 +23,4 @@ namespace tcp
         bool initialized_;
 #endif
     };
-
 }

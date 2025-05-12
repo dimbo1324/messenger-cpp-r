@@ -1,10 +1,8 @@
 #pragma once
 #include <string>
 #include <cstddef>
-
 namespace tcp
 {
-
     class ISocket
     {
     public:
@@ -14,5 +12,4 @@ namespace tcp
         virtual std::size_t receive(char *buffer, std::size_t maxlen) = 0;
         virtual void close() = 0;
     };
-
 }

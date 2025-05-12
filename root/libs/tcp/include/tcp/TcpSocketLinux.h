@@ -4,10 +4,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-
 namespace tcp
 {
-
     class TcpSocketLinux : public ISocket
     {
     public:
@@ -21,5 +19,4 @@ namespace tcp
     private:
         int sockfd_;
     };
-
 }

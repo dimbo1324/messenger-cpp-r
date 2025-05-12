@@ -1,4 +1,3 @@
-
 *.o
 *.obj
 *.lo
@@ -6,7 +5,6 @@
 *.d
 *.pch
 *.gch
-
 *.so
 *.dylib
 *.dll
@@ -14,11 +12,9 @@
 *.lib
 *.la
 *.lai
-
 *.exe
 *.out
 *.app
-
 CMakeCache.txt
 CMakeFiles/
 CMakeScripts/
@@ -27,29 +23,21 @@ install_manifest.txt
 # Makefile
 build/
 bin/
-
 .vscode/
-
 *.sdf
 *.opensdf
 *.VC.db
 *.VC.opendb
 .vs/
-
 .idea/
 *.iml
 cmake-build-*/
-
 *.pro.user*
 *.qmake.stash
 *.qmlproject.user*
-
 [Dd]esktop.ini
 Thumbs.db
 ehthumbs.db
-
 .DS_Store
 .AppleDouble
 .LSOverride
-
-

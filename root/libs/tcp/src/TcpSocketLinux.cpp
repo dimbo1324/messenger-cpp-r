@@ -2,17 +2,13 @@
 #include "tcp/TcpSocketLinux.h"
 #include <cstring>
 #include <stdexcept>
-
 namespace tcp
 {
-
     TcpSocketLinux::TcpSocketLinux() : sockfd_(-1) {}
-
     TcpSocketLinux::~TcpSocketLinux()
     {
         close();
     }
-
     bool TcpSocketLinux::connect(const std::string &host, int port)
     {
         sockfd_ = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -26,18 +22,15 @@ namespace tcp
             return false;
         return (::connect(sockfd_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == 0);
     }
-
     std::size_t TcpSocketLinux::send(const char *data, std::size_t length)
     {
         return ::send(sockfd_, data, length, 0);
     }
-
     std::size_t TcpSocketLinux::receive(char *buffer, std::size_t maxlen)
     {
         ssize_t bytes = ::recv(sockfd_, buffer, static_cast<int>(maxlen), 0);
         return bytes > 0 ? static_cast<std::size_t>(bytes) : 0;
     }
-
     void TcpSocketLinux::close()
     {
         if (sockfd_ >= 0)
@@ -47,5 +40,4 @@ namespace tcp
             sockfd_ = -1;
         }
     }
-
 }
