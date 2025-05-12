@@ -2,8 +2,13 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 int main(int argc, char *argv[])
 {
+    SetConsoleCP(65001);
+    SetConsoleOutputCP(65001);
     if (argc != 2)
     {
         std::cerr << "Использование: chat_client <хост:порт>\n";
