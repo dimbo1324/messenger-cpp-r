@@ -1,27 +1,51 @@
-#pragma once
+#include "ClientHandler.h"
+#include "Logger.h"
 
-#include <thread>
-#include <memory>
-#include "tcp/ISocket.h"
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
-namespace server
+#include <cstring>
+
+ClientHandler::ClientHandler(int socket)
+    : clientSocket(socket),
+      handlerThread(&ClientHandler::run, this)
 {
+    handlerThread.detach();
+}
 
-    class ClientHandler
+ClientHandler::~ClientHandler()
+{
+}
+
+void ClientHandler::run()
+{
+    char buffer[1024];
+    Logger::getInstance().log("Client connected: socket=" + std::to_string(clientSocket));
+
+    while (true)
     {
-    public:
-        explicit ClientHandler(int clientSocketFd);
-        ~ClientHandler();
+        std::memset(buffer, 0, sizeof(buffer));
+        int bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytes <= 0)
+        {
+            Logger::getInstance().log("Client disconnected: socket=" + std::to_string(clientSocket));
+            break;
+        }
 
-        void start();
-        void join();
+        std::string msg(buffer, bytes);
+        Logger::getInstance().log("Received from " + std::to_string(clientSocket) + ": " + msg);
 
-    private:
-        void run();
+        send(clientSocket, buffer, bytes, 0);
+    }
 
-        int clientFd_;
-        std::thread th_;
-        bool running_{false};
-    };
-
+#ifdef _WIN32
+    closesocket(clientSocket);
+#else
+    close(clientSocket);
+#endif
 }

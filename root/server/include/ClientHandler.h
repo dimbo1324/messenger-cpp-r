@@ -1,21 +1,22 @@
-#pragma once
-#include "tcp/ISocket.h"
-#include <memory>
-#include <thread>
-namespace server
-{
-    class ClientHandler
-    {
-    public:
-        ClientHandler(std::unique_ptr<tcp::ISocket> socket);
-        ~ClientHandler();
-        void start();
-        void join();
+#ifndef CLIENT_HANDLER_H
+#define CLIENT_HANDLER_H
 
-    private:
-        void run();
-        std::unique_ptr<tcp::ISocket> socket_;
-        std::thread thread_;
-        bool running_{false};
-    };
-}
+#include <thread>
+#include <string>
+
+class ClientHandler
+{
+public:
+    explicit ClientHandler(int clientSocket);
+    ~ClientHandler();
+
+    void handle() = delete;
+
+private:
+    int clientSocket;
+    std::thread handlerThread;
+
+    void run();
+};
+
+#endif

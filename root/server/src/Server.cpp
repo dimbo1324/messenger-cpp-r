@@ -1,79 +1,96 @@
 #include "Server.h"
 #include "ClientHandler.h"
 #include "Logger.h"
+
 #ifdef _WIN32
 #include <winsock2.h>
-#pragma comment(lib, "Ws2_32.lib")
+#include <ws2tcpip.h>
 #else
-#include <arpa/inet.h>
 #include <sys/socket.h>
-#include <netdb.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #endif
-namespace server
+
+#include <cstring>
+#include <cstdlib>
+#include <iostream>
+
+Server::Server(int port)
+    : port(port), serverSocket(-1)
 {
-    Server::Server(const std::string &host, unsigned short port)
-        : host_(host), port_(port), listenFd_(-1) {}
-    Server::~Server()
-    {
-        Logger::instance().log("Server", "Остановка сервера");
+    initSocket();
+}
+
+Server::~Server()
+{
+    Logger::getInstance().log("Server shutting down");
 #ifdef _WIN32
-        closesocket(listenFd_);
-        WSACleanup();
+    closesocket(serverSocket);
+    WSACleanup();
 #else
-        ::close(listenFd_);
+    close(serverSocket);
 #endif
-    }
-    void Server::setupSocket()
-    {
+}
+
+void Server::initSocket()
+{
 #ifdef _WIN32
-        WSADATA wsaData;
-        WSAStartup(MAKEWORD(2, 2), &wsaData);
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+        std::cerr << "WSAStartup failed\n";
+        std::exit(EXIT_FAILURE);
+    }
 #endif
-        listenFd_ = socket(AF_INET, SOCK_STREAM, 0);
-        if (listenFd_ < 0)
-        {
-            throw std::runtime_error("Не удалось создать сокет");
-        }
-        sockaddr_in addr{};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(port_);
-        addr.sin_addr.s_addr = inet_addr(host_.c_str());
-        int opt = 1;
-        setsockopt(listenFd_, SOL_SOCKET, SO_REUSEADDR,
-                   reinterpret_cast<char *>(&opt), sizeof(opt));
-        if (bind(listenFd_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0)
-        {
-            throw std::runtime_error("Bind error");
-        }
-        if (listen(listenFd_, 5) < 0)
-        {
-            throw std::runtime_error("Listen error");
-        }
-        Logger::instance().log("Server", "Слушаем " + host_ + ":" + std::to_string(port_));
-    }
-    void Server::acceptLoop()
+
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0)
     {
-        while (true)
-        {
-            sockaddr_in clientAddr;
-            socklen_t len = sizeof(clientAddr);
-            int clientFd = accept(listenFd_,
-                                  reinterpret_cast<sockaddr *>(&clientAddr),
-                                  &len);
-            if (clientFd < 0)
-            {
-                Logger::instance().log("Error", "Accept failed");
-                continue;
-            }
-            auto handler = std::make_unique<ClientHandler>(clientFd);
-            handler->start();
-            clients_.push_back(std::move(handler));
-        }
+        perror("socket");
+        std::exit(EXIT_FAILURE);
     }
-    void Server::run()
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    addr.sin_addr.s_addr = INADDR_ANY;
+
+    int opt = 1;
+#ifdef _WIN32
+    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
+#else
+    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+#endif
+
+    if (bind(serverSocket, (sockaddr *)&addr, sizeof(addr)) < 0)
     {
-        setupSocket();
-        acceptLoop();
+        perror("bind");
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (listen(serverSocket, 10) < 0)
+    {
+        perror("listen");
+        std::exit(EXIT_FAILURE);
+    }
+
+    Logger::getInstance().log("Server listening on port " + std::to_string(port));
+}
+
+void Server::start()
+{
+    while (true)
+    {
+        sockaddr_in clientAddr{};
+        socklen_t len = sizeof(clientAddr);
+
+        int clientSock = accept(serverSocket, (sockaddr *)&clientAddr, &len);
+        if (clientSock < 0)
+        {
+            Logger::getInstance().log("Failed to accept client");
+            continue;
+        }
+
+        new ClientHandler(clientSock);
     }
 }

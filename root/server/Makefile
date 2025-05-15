@@ -1,39 +1,21 @@
-CXX      = g++
-SRCDIR   = src
-INCDIR   = include
-TARGET   = chat_server
+CXX       := g++
+CXXFLAGS  := -std=c++17 -Wall -pthread
+INCLUDES  := -Iinclude
+SRC_DIR   := src
+OBJ_DIR   := obj
+TARGET    := chat_server
 
-CXXFLAGS = -std=c++17 \
-           -I$(INCDIR) \
-           -I../libs/tcp/include \
-           -I../libs/threading/include
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 
-LDFLAGS  = -L../libs/tcp       -ltcp \
-           -L../libs/threading -lthreading \
-           -lws2_32 \
-           -lMswsock \
-           -lAdvapi32 \
-           -pthread
+all: $(TARGET)
 
-.PHONY: all build libs server run clean
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
-all: build
-
-build: libs server
-
-libs:
-	$(MAKE) -C ../libs/tcp
-	$(MAKE) -C ../libs/threading
-
-server:
-	$(CXX) $(CXXFLAGS) \
-	  -o $(TARGET) \
-	  $(SRCDIR)/main.cpp $(SRCDIR)/Server.cpp \
-      $(SRCDIR)/ClientHandler.cpp $(SRCDIR)/Logger.cpp \
-	  $(LDFLAGS)
-
-run: build
-	./$(TARGET) 0.0.0.0 8080
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean:
-	rm -f $(TARGET)
+	rm -rf $(OBJ_DIR) $(TARGET) server.log
