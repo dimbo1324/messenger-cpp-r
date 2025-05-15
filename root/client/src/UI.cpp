@@ -48,12 +48,14 @@ namespace UI
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             return "";
         }
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         if (login.empty())
             return "";
         return login + " " + password;
     }
     std::string promptMessage()
     {
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         std::cout << "Message: ";
         std::string msg;
         if (!std::getline(std::cin, msg))
