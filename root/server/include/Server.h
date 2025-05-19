@@ -1,5 +1,7 @@
-#ifndef SERVER_H
-#define SERVER_H
+#pragma once
+#include <libpq-fe.h>
+#include <string>
+#include "ClientHandler.h"
 class Server
 {
 public:
@@ -8,8 +10,9 @@ public:
     void start();
 
 private:
+    void initDatabase();
+    void initSocket();
     int port;
     int serverSocket;
-    void initSocket();
+    PGconn *dbConn_;
 };
-#endif
