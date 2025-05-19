@@ -3,6 +3,7 @@
 #include <memory>
 #include <thread>
 #include "tcp/ISocket.h"
+
 class Client
 {
 public:
@@ -12,13 +13,19 @@ public:
 
 private:
     void connectToServer();
+    void registerUser();
     void login();
+    void listUsers();
     void sendMessage();
+    void history();
     void receiveLoop();
+
     std::unique_ptr<tcp::ISocket> socket_;
     std::thread recvThread_;
     bool running_{false};
+
     std::string serverHost_;
     unsigned short serverPort_;
+
     std::string currentUser_;
 };

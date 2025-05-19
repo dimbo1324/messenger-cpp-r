@@ -7,10 +7,10 @@
 #include <sstream>
 #include <chrono>
 #include <thread>
+
 Client::Client(const std::string &host, unsigned short port)
-    : serverHost_(host), serverPort_(port), socket_(nullptr), running_(false), currentUser_("")
-{
-}
+    : serverHost_(host), serverPort_(port), socket_(nullptr), running_(false) {}
+
 Client::~Client()
 {
     running_ = false;
@@ -20,6 +20,7 @@ Client::~Client()
         recvThread_.join();
     std::cout << "Клиент завершил работу.\n";
 }
+
 void Client::connectToServer()
 {
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
@@ -28,152 +29,191 @@ void Client::connectToServer()
         socket_ = tcp::createSocket();
         if (!socket_)
         {
-            std::cerr << "Ошибка: не удалось создать сокет. Повтор через секунду...\n";
             std::this_thread::sleep_for(std::chrono::seconds(1));
             continue;
         }
-        std::cout << "Попытка подключения к "
-                  << serverHost_ << ":" << serverPort_ << "...\n";
+        std::cout << "Попытка подключения к " << serverHost_ << ":" << serverPort_ << "...\n";
         if (socket_->connect(serverHost_, serverPort_))
         {
             std::cout << "Успешно подключено к серверу.\n";
             running_ = true;
             return;
         }
-        else
-        {
-            std::cerr << "Не удалось подключиться. Повтор через секунду...\n";
-            socket_.reset();
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+        socket_.reset();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    std::cerr << "Таймаут 60 секунд истёк — сервер недоступен. Выходим.\n";
-    running_ = false;
+    std::cerr << "Таймаут 60 сек — сервер недоступен.\n";
 }
-void Client::login()
+
+void Client::registerUser()
 {
-    if (!socket_ || !running_)
+    auto creds = UI::promptRegistration();
+    if (creds.empty())
     {
-        std::cerr << "Не подключено к серверу. Вход невозможен.\n";
+        std::cout << "Регистрация отменена.\n";
         return;
     }
-    auto creds_str = UI::promptLogin();
-    if (creds_str.empty())
+
+    std::string packet = "REGISTER " + creds + "\n";
+    socket_->send(packet.c_str(), packet.size());
+    char buf[TCP_BUFFER_SIZE];
+    auto r = socket_->receive(buf, TCP_BUFFER_SIZE - 1);
+    if (r <= 0)
+    {
+        std::cerr << "Нет ответа сервера.\n";
+        return;
+    }
+    buf[r] = '\0';
+    std::string resp(buf);
+    if (resp.find("REGISTER_OK") != std::string::npos)
+        std::cout << "Регистрация успешна.\n";
+    else
+        std::cout << "Ошибка регистрации: " << resp;
+}
+
+void Client::login()
+{
+    auto creds = UI::promptLogin();
+    if (creds.empty())
     {
         std::cout << "Вход отменён.\n";
         return;
     }
-    std::string login_packet = "LOGIN " + creds_str + "\n";
-    if (socket_->send(login_packet.c_str(), login_packet.length()) != login_packet.length())
+    std::string packet = "LOGIN " + creds + "\n";
+    socket_->send(packet.c_str(), packet.size());
+    char buf[TCP_BUFFER_SIZE];
+    auto r = socket_->receive(buf, TCP_BUFFER_SIZE - 1);
+    if (r <= 0)
     {
-        std::cerr << "Ошибка отправки логина. Закрываемся.\n";
-        running_ = false;
+        std::cerr << "Нет ответа сервера.\n";
         return;
     }
-    char buffer[TCP_BUFFER_SIZE];
-    auto received = socket_->receive(buffer, TCP_BUFFER_SIZE - 1);
-    if (received > 0)
+    buf[r] = '\0';
+    std::string resp(buf);
+    if (resp.find("LOGIN_OK") != std::string::npos)
     {
-        buffer[received] = '\0';
-        std::string resp(buffer);
-        if (resp.find("LOGIN_OK") != std::string::npos)
-        {
-            auto space = creds_str.find(' ');
-            currentUser_ = (space != std::string::npos
-                                ? creds_str.substr(0, space)
-                                : creds_str);
-            std::cout << "Вход успешен: " << currentUser_ << "\n";
-        }
-        else
-        {
-            std::cerr << "Ошибка входа: " << resp;
-        }
+        currentUser_ = creds.substr(0, creds.find(' '));
+        std::cout << "Вход успешен: " << currentUser_ << "\n";
     }
     else
     {
-        std::cerr << "Не получили ответа от сервера. Закрываемся.\n";
-        running_ = false;
+        std::cout << "Ошибка входа: " << resp;
     }
 }
+
+void Client::listUsers()
+{
+    std::string packet = "LIST\n";
+    socket_->send(packet.c_str(), packet.size());
+    char buf[TCP_BUFFER_SIZE];
+    auto r = socket_->receive(buf, TCP_BUFFER_SIZE - 1);
+    if (r > 0)
+    {
+        buf[r] = '\0';
+        std::cout << "Online: " << buf;
+    }
+}
+
 void Client::sendMessage()
 {
-    if (!socket_ || !running_ || currentUser_.empty())
+    if (currentUser_.empty())
     {
-        std::cerr << "Не подключено или не залогинен.\n";
+        std::cerr << "Не залогинен.\n";
         return;
     }
+    auto target = UI::promptTargetUser();
+    if (target.empty())
+        return;
     auto msg = UI::promptMessage();
     if (msg.empty())
-    {
-        std::cout << "Сообщение пустое — не отправляем.\n";
         return;
-    }
-    std::string packet = "MESSAGE " + currentUser_ + " " + msg + "\n";
-    if (socket_->send(packet.c_str(), packet.length()) != packet.length())
+    std::string packet = "MESSAGE " + target + " " + msg + "\n";
+    socket_->send(packet.c_str(), packet.size());
+    char buf[TCP_BUFFER_SIZE];
+    auto r = socket_->receive(buf, TCP_BUFFER_SIZE - 1);
+    if (r > 0)
     {
-        std::cerr << "Ошибка отправки сообщения. Закрываемся.\n";
-        running_ = false;
-    }
-    else
-    {
-        std::cout << "Сообщение отправлено.\n";
+        buf[r] = '\0';
+        std::cout << buf;
     }
 }
+
+void Client::history()
+{
+    if (currentUser_.empty())
+        return;
+    auto target = UI::promptTargetUser();
+    if (target.empty())
+        return;
+    std::string packet = "HISTORY " + target + "\n";
+    socket_->send(packet.c_str(), packet.size());
+    char buf[TCP_BUFFER_SIZE];
+    while (true)
+    {
+        auto r = socket_->receive(buf, TCP_BUFFER_SIZE - 1);
+        if (r <= 0)
+            break;
+        buf[r] = '\0';
+        std::string line(buf);
+        if (line.find("HISTORY_END") != std::string::npos)
+            break;
+        std::cout << line;
+    }
+}
+
 void Client::receiveLoop()
 {
     while (running_)
     {
-        char buffer[TCP_BUFFER_SIZE];
-        auto received = socket_->receive(buffer, TCP_BUFFER_SIZE - 1);
-        if (received > 0)
+        char buf[TCP_BUFFER_SIZE];
+        auto r = socket_->receive(buf, TCP_BUFFER_SIZE - 1);
+        if (r > 0)
         {
-            buffer[received] = '\0';
-            std::cout << "Получено: " << buffer;
-        }
-        else if (received == 0)
-        {
-            std::cout << "Сервер закрыл соединение.\n";
-            running_ = false;
+            buf[r] = '\0';
+            std::cout << "<" << buf;
         }
         else
         {
-            std::cerr << "Ошибка при получении данных.\n";
             running_ = false;
         }
     }
 }
+
 void Client::run()
 {
     connectToServer();
     if (!running_)
         return;
     recvThread_ = std::thread(&Client::receiveLoop, this);
+
     while (running_)
     {
         if (currentUser_.empty())
         {
-            char cmd = UI::showLoginMenu();
+            char cmd = UI::showInitialMenu();
             if (cmd == 'l')
                 login();
+            else if (cmd == 'r')
+                registerUser();
             else if (cmd == 'q')
                 running_ = false;
-            else
-                std::cout << "Неверный ввод.\n";
         }
         else
         {
             char cmd = UI::showUserMenu(currentUser_);
-            if (cmd == 's')
+            if (cmd == 'l')
+                listUsers();
+            else if (cmd == 's')
                 sendMessage();
+            else if (cmd == 'h')
+                history();
             else if (cmd == 'o')
             {
                 currentUser_.clear();
-                std::cout << "Выход из аккаунта.\n";
             }
-            else
-                std::cout << "Неверный ввод.\n";
         }
     }
+
     if (recvThread_.joinable())
         recvThread_.join();
 }

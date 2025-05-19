@@ -1,89 +1,168 @@
 #include "ClientHandler.h"
 #include "Logger.h"
+#include <fstream>
+#include <sstream>
+#include <cstring>
 #ifdef _WIN32
 #include <winsock2.h>
-#include <ws2tcpip.h>
 #else
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
-#include <cstring>
-#include <string>
-#include <algorithm>
-ClientHandler::ClientHandler(int socket)
-    : clientSocket(socket),
-      handlerThread(&ClientHandler::run, this)
+
+std::map<std::string, std::string> ClientHandler::credentials_;
+std::map<std::string, int> ClientHandler::onlineClients_;
+std::map<std::string, std::vector<std::string>> ClientHandler::history_[2];
+std::mutex ClientHandler::mtx_;
+
+static bool credsLoaded = []()
 {
-    handlerThread.detach();
+    std::ifstream f("credentials.txt");
+    std::string u, p;
+    while (f >> u >> p)
+        ClientHandler::credentials_[u] = p;
+    return true;
+}();
+
+ClientHandler::ClientHandler(int sock)
+    : clientSocket_(sock),
+      handlerThread_(&ClientHandler::run, this)
+{
+    handlerThread_.detach();
 }
+
 ClientHandler::~ClientHandler()
 {
 #ifdef _WIN32
-    closesocket(clientSocket);
+    closesocket(clientSocket_);
 #else
-    close(clientSocket);
+    close(clientSocket_);
 #endif
 }
+
+void ClientHandler::sendLine(int sock, const std::string &line)
+{
+    std::string l = line + "\n";
+    ::send(sock, l.c_str(), (int)l.size(), 0);
+}
+
+bool ClientHandler::handleRegister(const std::string &login, const std::string &pass)
+{
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (credentials_.count(login))
+        return false;
+    credentials_[login] = pass;
+    std::ofstream f("credentials.txt", std::ios::app);
+    f << login << " " << pass << "\n";
+    return true;
+}
+
+bool ClientHandler::handleLogin(const std::string &login, const std::string &pass)
+{
+    std::lock_guard<std::mutex> lk(mtx_);
+    auto it = credentials_.find(login);
+    if (it == credentials_.end() || it->second != pass)
+        return false;
+    onlineClients_[login] = clientSocket_;
+    return true;
+}
+
 void ClientHandler::run()
 {
-    char buffer[1024];
-    bool loggedIn = false;
+    char buf[1024];
     std::string username;
-    Logger::getInstance().log("Клиент подключён: socket=" + std::to_string(clientSocket));
+    bool authed = false;
+    Logger::getInstance().log("Подключился socket=" + std::to_string(clientSocket_));
+
     while (true)
     {
-        std::memset(buffer, 0, sizeof(buffer));
-        int bytes = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-        if (bytes <= 0)
-        {
-            Logger::getInstance().log("Клиент отключён: socket=" + std::to_string(clientSocket));
+        int n = recv(clientSocket_, buf, sizeof(buf) - 1, 0);
+        if (n <= 0)
             break;
-        }
-        std::string msg(buffer, bytes);
-        Logger::getInstance().log("Получено от " + std::to_string(clientSocket) + ": " + msg);
-        if (!msg.empty() && msg.back() == '\n')
-            msg.pop_back();
-        if (!loggedIn)
+        buf[n] = 0;
+        std::string line(buf);
+        if (line.back() == '\n')
+            line.pop_back();
+
+        std::istringstream iss(line);
+        std::string cmd;
+        iss >> cmd;
+
+        if (cmd == "REGISTER")
         {
-            const std::string prefix = "LOGIN ";
-            if (msg.rfind(prefix, 0) == 0)
+            std::string u, p;
+            iss >> u >> p;
+            if (handleRegister(u, p))
+                sendLine(clientSocket_, "REGISTER_OK");
+            else
+                sendLine(clientSocket_, "REGISTER_ERROR");
+        }
+        else if (cmd == "LOGIN")
+        {
+            std::string u, p;
+            iss >> u >> p;
+            if (handleLogin(u, p))
             {
-                auto spacePos = msg.find(' ', prefix.size());
-                if (spacePos != std::string::npos)
-                {
-                    username = msg.substr(prefix.size(), spacePos - prefix.size());
-                }
-                else
-                {
-                    username = msg.substr(prefix.size());
-                }
-                const char *ok = "LOGIN_OK\n";
-                send(clientSocket, ok, strlen(ok), 0);
-                Logger::getInstance().log("Пользователь вошёл: " + username);
-                loggedIn = true;
-                continue;
+                authed = true;
+                username = u;
+                sendLine(clientSocket_, "LOGIN_OK");
+                Logger::getInstance().log("User logged in: " + u);
             }
             else
+                sendLine(clientSocket_, "LOGIN_ERROR");
+        }
+        else if (!authed)
+        {
+            sendLine(clientSocket_, "ERROR_NOT_AUTH");
+        }
+        else if (cmd == "LIST")
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            std::string out = "USERS";
+            for (auto &kv : onlineClients_)
+                out += " " + kv.first;
+            sendLine(clientSocket_, out);
+        }
+        else if (cmd == "MESSAGE")
+        {
+            std::string to;
+            iss >> to;
+            std::string msg;
+            std::getline(iss, msg);
+            std::lock_guard<std::mutex> lk(mtx_);
+            history_[0][username + "->" + to].push_back(msg);
+            history_[1][to + "->" + username].push_back(msg);
+            if (onlineClients_.count(to))
             {
-                const char *err = "LOGIN_ERROR\n";
-                send(clientSocket, err, strlen(err), 0);
-                continue;
+                int s = onlineClients_[to];
+                sendLine(s, "MESSAGE " + username + msg);
             }
+            sendLine(clientSocket_, "MESSAGE_OK");
+        }
+        else if (cmd == "HISTORY")
+        {
+            std::string to;
+            iss >> to;
+            std::lock_guard<std::mutex> lk(mtx_);
+            auto &hist = history_[0][username + "->" + to];
+            for (auto &m : hist)
+                sendLine(clientSocket_, "HIST " + m);
+            sendLine(clientSocket_, "HISTORY_END");
+        }
+        else if (cmd == "QUIT")
+        {
+            break;
         }
         else
         {
-            const std::string mtx = "MESSAGE ";
-            if (msg.rfind(mtx, 0) == 0)
-            {
-                std::string echo = "MESSAGE_OK " + msg.substr(mtx.size()) + "\n";
-                send(clientSocket, echo.c_str(), echo.size(), 0);
-                Logger::getInstance().log("Эхо для " + username + ": " + echo);
-            }
-            else
-            {
-                const char *err = "UNKNOWN_CMD\n";
-                send(clientSocket, err, strlen(err), 0);
-            }
+            sendLine(clientSocket_, "UNKNOWN_CMD");
         }
     }
+
+    if (authed)
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        onlineClients_.erase(username);
+    }
+    Logger::getInstance().log("Отключился socket=" + std::to_string(clientSocket_));
 }
