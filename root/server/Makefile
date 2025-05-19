@@ -7,7 +7,9 @@ TARGET   := chat_server
 LIB_TCP_DIR       := ../libs/tcp
 LIB_THREADING_DIR := ../libs/threading
 
-PG_INCLUDE := "C:/Program Files/PostgreSQL/16/include"
+# Пути к PostgreSQL из MSYS2 MinGW64
+PG_INCLUDE := /mingw64/include
+PG_LIBDIR  := /mingw64/lib
 
 CXXFLAGS := -std=c++17 \
             -I$(INCDIR) \
@@ -17,7 +19,7 @@ CXXFLAGS := -std=c++17 \
 
 LDFLAGS  := -L$(LIB_TCP_DIR)       -ltcp \
             -L$(LIB_THREADING_DIR) -lthreading \
-            -lpq                    \
+            -L$(PG_LIBDIR)         -lpq \
             -lws2_32               \
             -lMswsock              \
             -lAdvapi32             \
