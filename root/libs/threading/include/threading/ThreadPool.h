@@ -5,10 +5,8 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
-
 namespace threading
 {
-
     class ThreadPool
     {
     public:
@@ -23,5 +21,4 @@ namespace threading
         std::condition_variable condition_;
         bool stop_{false};
     };
-
 }

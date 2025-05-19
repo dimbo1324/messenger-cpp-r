@@ -1,10 +1,8 @@
 #pragma once
 #include <string>
 #include <mutex>
-
 namespace threading
 {
-
     class Logger
     {
     public:
@@ -18,5 +16,4 @@ namespace threading
         Logger &operator=(const Logger &) = delete;
         std::mutex mtx_;
     };
-
 }

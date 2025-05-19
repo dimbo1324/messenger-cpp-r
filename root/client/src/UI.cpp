@@ -3,7 +3,6 @@
 #include <limits>
 #include <string>
 #include <cctype>
-
 namespace UI
 {
     char showInitialMenu()
@@ -19,7 +18,6 @@ namespace UI
         std::cin.ignore(INT_MAX, '\n');
         return static_cast<char>(std::tolower(c));
     }
-
     char showUserMenu(const std::string &currentUserName)
     {
         std::cout << "[" << currentUserName << "] "
@@ -34,7 +32,6 @@ namespace UI
         std::cin.ignore(INT_MAX, '\n');
         return static_cast<char>(std::tolower(c));
     }
-
     std::string promptLogin()
     {
         std::string login, password;
@@ -47,7 +44,6 @@ namespace UI
         std::cin.ignore(INT_MAX, '\n');
         return login + " " + password;
     }
-
     std::string promptRegistration()
     {
         std::string login, password;
@@ -60,7 +56,6 @@ namespace UI
         std::cin.ignore(INT_MAX, '\n');
         return login + " " + password;
     }
-
     std::string promptTargetUser()
     {
         std::cout << "User name: ";
@@ -70,7 +65,6 @@ namespace UI
         std::cin.ignore(INT_MAX, '\n');
         return u;
     }
-
     std::string promptMessage()
     {
         std::cout << "Message: ";
