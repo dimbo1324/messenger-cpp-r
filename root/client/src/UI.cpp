@@ -13,26 +13,26 @@ namespace UI
         if (!(std::cin >> c))
         {
             std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cin.ignore(INT_MAX, '\n');
             return '\0';
         }
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        std::cin.ignore(INT_MAX, '\n');
+        return static_cast<char>(std::tolower(c));
     }
 
     char showUserMenu(const std::string &currentUserName)
     {
         std::cout << "[" << currentUserName << "] "
-                  << "[L]ist users, [S]end message, [H]istory, [O]ut: ";
+                  << "[L]ist users, [I]nbox, [S]end, [H]istory, [O]ut: ";
         char c;
         if (!(std::cin >> c))
         {
             std::cin.clear();
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cin.ignore(INT_MAX, '\n');
             return '\0';
         }
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        std::cin.ignore(INT_MAX, '\n');
+        return static_cast<char>(std::tolower(c));
     }
 
     std::string promptLogin()
@@ -40,17 +40,11 @@ namespace UI
         std::string login, password;
         std::cout << "Login: ";
         if (!(std::cin >> login))
-        {
-            std::cin.clear();
             return "";
-        }
         std::cout << "Password: ";
         if (!(std::cin >> password))
-        {
-            std::cin.clear();
             return "";
-        }
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.ignore(INT_MAX, '\n');
         return login + " " + password;
     }
 
@@ -59,17 +53,11 @@ namespace UI
         std::string login, password;
         std::cout << "New login: ";
         if (!(std::cin >> login))
-        {
-            std::cin.clear();
             return "";
-        }
         std::cout << "New password: ";
         if (!(std::cin >> password))
-        {
-            std::cin.clear();
             return "";
-        }
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.ignore(INT_MAX, '\n');
         return login + " " + password;
     }
 
@@ -78,11 +66,8 @@ namespace UI
         std::cout << "User name: ";
         std::string u;
         if (!(std::cin >> u))
-        {
-            std::cin.clear();
             return "";
-        }
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.ignore(INT_MAX, '\n');
         return u;
     }
 

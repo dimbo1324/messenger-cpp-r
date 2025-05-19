@@ -16,6 +16,7 @@ private:
     void registerUser();
     void login();
     void listUsers();
+    void inbox();
     void sendMessage();
     void history();
     void receiveLoop();
@@ -26,6 +27,5 @@ private:
 
     std::string serverHost_;
     unsigned short serverPort_;
-
     std::string currentUser_;
 };

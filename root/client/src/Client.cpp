@@ -44,7 +44,7 @@ void Client::connectToServer()
         socket_.reset();
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    std::cerr << "Таймаут 60 сек — сервер недоступен.\n";
+    std::cerr << "Таймаут 60 сек — сервер недоступен.\n";
 }
 void Client::registerUser()
 {
@@ -54,8 +54,7 @@ void Client::registerUser()
         std::cout << "Регистрация отменена.\n";
         return;
     }
-    std::string packet = "REGISTER " + creds + "\n";
-    socket_->send(packet.c_str(), packet.size());
+    socket_->send(("REGISTER " + creds + "\n").c_str(), creds.size() + 10);
 }
 void Client::login()
 {
@@ -65,18 +64,17 @@ void Client::login()
         std::cout << "Вход отменён.\n";
         return;
     }
-    auto spacePos = creds.find(' ');
-    std::string loginName = (spacePos != std::string::npos
-                                 ? creds.substr(0, spacePos)
-                                 : creds);
-    currentUser_ = loginName;
-    std::string packet = "LOGIN " + creds + "\n";
-    socket_->send(packet.c_str(), packet.size());
+    auto space = creds.find(' ');
+    currentUser_ = creds.substr(0, space);
+    socket_->send(("LOGIN " + creds + "\n").c_str(), creds.size() + 6);
 }
 void Client::listUsers()
 {
-    std::string packet = "LIST\n";
-    socket_->send(packet.c_str(), packet.size());
+    socket_->send("LIST\n", 5);
+}
+void Client::inbox()
+{
+    socket_->send("INBOX\n", 6);
 }
 void Client::sendMessage()
 {
@@ -85,17 +83,14 @@ void Client::sendMessage()
         std::cerr << "Не залогинен.\n";
         return;
     }
-    auto target = UI::promptTargetUser();
-    if (target.empty())
+    auto to = UI::promptTargetUser();
+    if (to.empty())
         return;
     auto msg = UI::promptMessage();
     if (msg.empty())
-    {
-        std::cout << "Пустое сообщение не отправляется.\n";
         return;
-    }
-    std::string packet = "MESSAGE " + target + " " + msg + "\n";
-    socket_->send(packet.c_str(), packet.size());
+    socket_->send(("MESSAGE " + to + " " + msg + "\n").c_str(),
+                  9 + to.size() + msg.size());
 }
 void Client::history()
 {
@@ -104,11 +99,10 @@ void Client::history()
         std::cerr << "Не залогинен.\n";
         return;
     }
-    auto target = UI::promptTargetUser();
-    if (target.empty())
+    auto to = UI::promptTargetUser();
+    if (to.empty())
         return;
-    std::string packet = "HISTORY " + target + "\n";
-    socket_->send(packet.c_str(), packet.size());
+    socket_->send(("HISTORY " + to + "\n").c_str(), 9 + to.size());
 }
 void Client::receiveLoop()
 {
@@ -129,29 +123,41 @@ void Client::receiveLoop()
         std::string cmd;
         iss >> cmd;
         if (cmd == "REGISTER_OK")
-        {
-            std::cout << "Регистрация прошла успешно!\n";
-        }
+            std::cout << "Регистрация OK\n";
         else if (cmd == "REGISTER_ERROR")
-        {
-            std::cout << "Ошибка регистрации.\n";
-        }
+            std::cout << "Регистрация FAILED\n";
         else if (cmd == "LOGIN_OK")
-        {
-            std::cout << "Вход выполнен успешно!\n";
-        }
+            std::cout << "Вход OK\n";
         else if (cmd == "LOGIN_ERROR")
         {
-            std::cout << "Неверный логин или пароль.\n";
+            std::cout << "Вход FAILED\n";
             currentUser_.clear();
         }
         else if (cmd == "USERS")
         {
-            std::string user;
-            std::cout << "Сейчас в чате: ";
-            while (iss >> user)
-                std::cout << user << " ";
+            std::cout << "Онлайн: ";
+            std::string u;
+            while (iss >> u)
+                std::cout << u << " ";
             std::cout << "\n";
+        }
+        else if (cmd == "INBOX_COUNT")
+        {
+            int cnt;
+            iss >> cnt;
+            std::cout << "У вас " << cnt << " новых письма(ь).\n";
+        }
+        else if (cmd == "INBOX_MSG")
+        {
+            std::string from;
+            iss >> from;
+            std::string msg;
+            std::getline(iss, msg);
+            std::cout << "[" << from << "]:" << msg << "\n";
+        }
+        else if (cmd == "INBOX_END")
+        {
+            std::cout << "— конец входящих —\n";
         }
         else if (cmd == "MESSAGE")
         {
@@ -187,25 +193,39 @@ void Client::run()
     {
         if (currentUser_.empty())
         {
-            char cmd = UI::showInitialMenu();
-            if (cmd == 'l')
+            switch (UI::showInitialMenu())
+            {
+            case 'l':
                 login();
-            else if (cmd == 'r')
+                break;
+            case 'r':
                 registerUser();
-            else if (cmd == 'q')
+                break;
+            case 'q':
                 running_ = false;
+                break;
+            }
         }
         else
         {
-            char cmd = UI::showUserMenu(currentUser_);
-            if (cmd == 'l')
+            switch (UI::showUserMenu(currentUser_))
+            {
+            case 'l':
                 listUsers();
-            else if (cmd == 's')
+                break;
+            case 'i':
+                inbox();
+                break;
+            case 's':
                 sendMessage();
-            else if (cmd == 'h')
+                break;
+            case 'h':
                 history();
-            else if (cmd == 'o')
+                break;
+            case 'o':
                 currentUser_.clear();
+                break;
+            }
         }
     }
     if (recvThread_.joinable())
