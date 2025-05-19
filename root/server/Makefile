@@ -7,11 +7,13 @@ TARGET   := chat_server
 LIB_TCP_DIR       := ../libs/tcp
 LIB_THREADING_DIR := ../libs/threading
 
+PG_INCLUDE := "C:/Program Files/PostgreSQL/16/include"
+
 CXXFLAGS := -std=c++17 \
             -I$(INCDIR) \
             -I$(LIB_TCP_DIR)/include \
             -I$(LIB_THREADING_DIR)/include \
-            -I/usr/include/postgresql
+            -I$(PG_INCLUDE)
 
 LDFLAGS  := -L$(LIB_TCP_DIR)       -ltcp \
             -L$(LIB_THREADING_DIR) -lthreading \
