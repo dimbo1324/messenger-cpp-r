@@ -1,0 +1,25 @@
+{
+  "configurations": [
+    {
+      "name": "windows-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "C:/Program Files/PostgreSQL/16/include",
+        "C:/Vcpkg/vcpkg/installed/x64-windows/include"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}",
+          "C:/Program Files/PostgreSQL/16/include",
+          "C:/Vcpkg/vcpkg/installed/x64-windows/include"
+        ]
+      },
+      "compilerPath": "C:/msys64/ucrt64/bin/gcc.exe",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-gcc-x64",
+      "compilerArgs": []
+    }
+  ],
+  "version": 4
+}

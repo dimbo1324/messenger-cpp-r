@@ -1,19 +1,23 @@
-CXX      := g++
-SRCDIR   := src
-INCDIR   := include
-TARGET   := chat_server
+CXX            := g++
+SRCDIR         := src
+INCDIR         := include
+TARGET         := chat_server
 LIB_TCP_DIR       := ../libs/tcp
 LIB_THREADING_DIR := ../libs/threading
-CXXFLAGS := -std=c++17 \
-            -I$(INCDIR) \
-            -I$(LIB_TCP_DIR)/include \
-            -I$(LIB_THREADING_DIR)/include
-LDFLAGS  := -L$(LIB_TCP_DIR)       -ltcp \
-            -L$(LIB_THREADING_DIR) -lthreading \
-            -lws2_32               \
-            -lMswsock              \
-            -lAdvapi32             \
-            -pthread
+VCPKG_ROOT     := C:/Vcpkg/vcpkg
+CXXFLAGS       := -std=c++17 \
+                  -I$(INCDIR) \
+                  -I$(LIB_TCP_DIR)/include \
+                  -I$(LIB_THREADING_DIR)/include \
+                  -I$(VCPKG_ROOT)/installed/x64-windows/include
+LDFLAGS        := -L$(LIB_TCP_DIR)       -ltcp \
+                  -L$(LIB_THREADING_DIR) -lthreading \
+                  -lws2_32               \
+                  -lMswsock              \
+                  -lAdvapi32             \
+                  -L$(VCPKG_ROOT)/installed/x64-windows/lib \
+                  -lpqxx -lpq \
+                  -pthread
 .PHONY: all build libs server run clean
 all: build
 build: libs server

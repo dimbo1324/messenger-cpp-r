@@ -23,7 +23,7 @@ install_manifest.txt
 # Makefile
 build/
 bin/
-.vscode/
+# .vscode/
 *.sdf
 *.opensdf
 *.VC.db
