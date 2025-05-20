@@ -4,16 +4,15 @@
 #include <string>
 #include <map>
 #include <mutex>
-
+#include <memory>
+#include "Database.h"
 class ClientHandler
 {
 public:
-    explicit ClientHandler(int clientSocket);
+    explicit ClientHandler(int clientSocket, std::shared_ptr<Database> db);
     ~ClientHandler();
     void run();
     static std::mutex mtx_;
-    static std::map<std::string, std::string> credentials_;
-    static std::map<std::string, int> onlineClients_;
 
 private:
     bool handleRegister(const std::string &login, const std::string &pass);
@@ -23,5 +22,6 @@ private:
     void handleHistory(const std::string &login, const std::string &target);
     void sendLine(int sock, const std::string &line);
     int clientSocket_;
+    std::shared_ptr<Database> db_;
 };
 #endif

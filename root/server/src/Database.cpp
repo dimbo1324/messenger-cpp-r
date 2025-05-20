@@ -1,6 +1,5 @@
 #include "Database.h"
 #include <iostream>
-
 Database::Database(const std::string &connStr)
     : conn_(nullptr)
 {
@@ -22,7 +21,6 @@ Database::Database(const std::string &connStr)
         throw;
     }
 }
-
 Database::~Database()
 {
     if (conn_)
@@ -31,7 +29,6 @@ Database::~Database()
         delete conn_;
     }
 }
-
 bool Database::registerUser(const std::string &login, const std::string &password)
 {
     try
@@ -47,7 +44,6 @@ bool Database::registerUser(const std::string &login, const std::string &passwor
         return false;
     }
 }
-
 bool Database::loginUser(const std::string &login, const std::string &password)
 {
     try
@@ -69,7 +65,6 @@ bool Database::loginUser(const std::string &login, const std::string &password)
         return false;
     }
 }
-
 void Database::sendMessage(int senderId, int receiverId, const std::string &text)
 {
     try
@@ -83,7 +78,6 @@ void Database::sendMessage(int senderId, int receiverId, const std::string &text
         std::cerr << "Ошибка отправки сообщения: " << e.what() << std::endl;
     }
 }
-
 std::vector<std::string> Database::getInbox(int userId)
 {
     std::vector<std::string> messages;
@@ -102,7 +96,6 @@ std::vector<std::string> Database::getInbox(int userId)
     }
     return messages;
 }
-
 void Database::logEvent(const std::string &eventType, int userId, const std::string &details)
 {
     try

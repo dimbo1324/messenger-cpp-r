@@ -3,7 +3,6 @@
 #include <string>
 #include <fstream>
 #include <mutex>
-
 class Logger
 {
 public:

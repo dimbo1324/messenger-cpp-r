@@ -1,10 +1,8 @@
 #ifndef DATABASE_H
 #define DATABASE_H
-
 #include <pqxx/pqxx>
 #include <string>
 #include <vector>
-
 class Database
 {
 public:
@@ -19,5 +17,4 @@ public:
 private:
     pqxx::connection *conn_;
 };
-
 #endif

@@ -3,7 +3,6 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
-
 Logger::Logger()
 {
     logFile.open("../logs/user_activity.log", std::ios::app);
@@ -12,19 +11,16 @@ Logger::Logger()
         throw std::runtime_error("Не удалось открыть файл логов");
     }
 }
-
 Logger::~Logger()
 {
     if (logFile.is_open())
         logFile.close();
 }
-
 Logger &Logger::getInstance()
 {
     static Logger instance;
     return instance;
 }
-
 void Logger::log(const std::string &message)
 {
     std::lock_guard<std::mutex> guard(logMutex);

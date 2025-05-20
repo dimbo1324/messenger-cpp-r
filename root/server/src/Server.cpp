@@ -13,13 +13,12 @@
 #include <cstring>
 #include <cstdlib>
 #include <iostream>
-
 Server::Server(int port)
     : port(port), serverSocket(-1)
 {
     initSocket();
+    db_ = std::make_shared<Database>("dbname=chat_db user=postgres password=your_password host=localhost port=5432");
 }
-
 Server::~Server()
 {
     Logger::getInstance().log("Server shutting down");
@@ -30,7 +29,6 @@ Server::~Server()
     close(serverSocket);
 #endif
 }
-
 void Server::initSocket()
 {
 #ifdef _WIN32
@@ -69,7 +67,6 @@ void Server::initSocket()
     }
     Logger::getInstance().log("Server listening on port " + std::to_string(port));
 }
-
 void Server::start()
 {
     threading::ThreadPool pool(4);
@@ -83,9 +80,9 @@ void Server::start()
             Logger::getInstance().log("Failed to accept client");
             continue;
         }
-        pool.enqueue([clientSock]()
+        pool.enqueue([clientSock, db = db_]()
                      {
-            ClientHandler handler(clientSock);
-            handler.run(); });
+ClientHandler handler(clientSock, db);
+handler.run(); });
     }
 }

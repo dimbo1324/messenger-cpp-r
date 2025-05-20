@@ -11,27 +11,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
-
 std::mutex ClientHandler::mtx_;
-std::map<std::string, std::string> ClientHandler::credentials_;
-std::map<std::string, int> ClientHandler::onlineClients_;
-
-static bool _loadCreds = []()
-{
-    std::ifstream f("credentials.txt");
-    std::string u, p;
-    while (f >> u >> p)
-    {
-        ClientHandler::credentials_[u] = p;
-    }
-    return true;
-}();
-
-ClientHandler::ClientHandler(int sock)
-    : clientSocket_(sock)
+ClientHandler::ClientHandler(int sock, std::shared_ptr<Database> db)
+    : clientSocket_(sock), db_(db)
 {
 }
-
 ClientHandler::~ClientHandler()
 {
 #ifdef _WIN32
@@ -40,110 +24,115 @@ ClientHandler::~ClientHandler()
     close(clientSocket_);
 #endif
 }
-
 void ClientHandler::sendLine(int sock, const std::string &line)
 {
     std::string l = line + "\n";
     ::send(sock, l.c_str(), static_cast<int>(l.size()), 0);
 }
-
 bool ClientHandler::handleRegister(const std::string &login, const std::string &pass)
 {
-    std::lock_guard<std::mutex> lk(mtx_);
-    if (credentials_.count(login))
+    if (db_->registerUser(login, pass))
+    {
+        sendLine(clientSocket_, "REGISTER_OK");
+        return true;
+    }
+    else
+    {
+        sendLine(clientSocket_, "REGISTER_ERROR");
         return false;
-    credentials_[login] = pass;
-    std::ofstream f("credentials.txt", std::ios::app);
-    f << login << " " << pass << "\n";
-    return true;
+    }
 }
-
 bool ClientHandler::handleLogin(const std::string &login, const std::string &pass)
 {
-    std::lock_guard<std::mutex> lk(mtx_);
-    auto it = credentials_.find(login);
-    if (it == credentials_.end() || it->second != pass)
+    if (db_->loginUser(login, pass))
+    {
+        sendLine(clientSocket_, "LOGIN_OK");
+        return true;
+    }
+    else
+    {
+        sendLine(clientSocket_, "LOGIN_ERROR");
         return false;
-    onlineClients_[login] = clientSocket_;
-    return true;
+    }
 }
-
 void ClientHandler::handleInbox(const std::string &login)
 {
-    std::lock_guard<std::mutex> lk(mtx_);
-    std::ifstream in("inbox.txt");
-    std::vector<std::pair<std::string, std::string>> msgs;
-    std::vector<std::pair<std::string, std::string>> rest;
-    std::string line;
-    while (std::getline(in, line))
+    int userId = getUserId(login);
+    if (userId == -1)
     {
-        std::istringstream iss(line);
-        std::string to, from, text;
-        std::getline(iss, to, '|');
-        std::getline(iss, from, '|');
-        std::getline(iss, text);
-        if (to == login)
-            msgs.emplace_back(from, text);
-        else
-            rest.emplace_back(to, from + "|" + text);
+        sendLine(clientSocket_, "ERROR_USER_NOT_FOUND");
+        return;
     }
-    in.close();
-    std::ofstream out("inbox.txt", std::ios::trunc);
-    for (auto &r : rest)
+    std::vector<std::string> messages = db_->getInbox(userId);
+    sendLine(clientSocket_, "INBOX_COUNT " + std::to_string(messages.size()));
+    for (const auto &msg : messages)
     {
-        out << r.first << "|" << r.second << "\n";
-    }
-    out.close();
-    sendLine(clientSocket_, "INBOX_COUNT " + std::to_string(msgs.size()));
-    for (auto &m : msgs)
-    {
-        sendLine(clientSocket_, "INBOX_MSG " + m.first + " " + m.second);
+        sendLine(clientSocket_, "INBOX_MSG " + msg);
     }
     sendLine(clientSocket_, "INBOX_END");
 }
-
 void ClientHandler::handleMessage(const std::string &from, const std::string &to, const std::string &text)
 {
+    int senderId = getUserId(from);
+    int receiverId = getUserId(to);
+    if (senderId == -1 || receiverId == -1)
     {
-        std::lock_guard<std::mutex> lk(mtx_);
-        std::ofstream f("history.txt", std::ios::app);
-        f << from << "|" << to << "|" << text << "\n";
+        sendLine(clientSocket_, "ERROR_USER_NOT_FOUND");
+        return;
     }
-    {
-        std::lock_guard<std::mutex> lk(mtx_);
-        std::ofstream f("inbox.txt", std::ios::app);
-        f << to << "|" << from << "|" << text << "\n";
-    }
-    {
-        std::lock_guard<std::mutex> lk(mtx_);
-        if (onlineClients_.count(to))
-            sendLine(onlineClients_[to], "MESSAGE " + from + " " + text);
-    }
+    db_->sendMessage(senderId, receiverId, text);
     sendLine(clientSocket_, "MESSAGE_OK");
 }
-
 void ClientHandler::handleHistory(const std::string &login, const std::string &target)
 {
-    std::lock_guard<std::mutex> lk(mtx_);
-    std::ifstream in("history.txt");
-    std::vector<std::string> hist;
-    std::string line;
-    while (std::getline(in, line))
+    int userId = getUserId(login);
+    int targetId = getUserId(target);
+    if (userId == -1 || targetId == -1)
     {
-        std::istringstream iss(line);
-        std::string from, to, text;
-        std::getline(iss, from, '|');
-        std::getline(iss, to, '|');
-        std::getline(iss, text);
-        if ((from == login && to == target) || (from == target && to == login))
-            hist.push_back("[" + from + " to " + to + "]: " + text);
+        sendLine(clientSocket_, "ERROR_USER_NOT_FOUND");
+        return;
     }
-    in.close();
-    for (auto &msg : hist)
-        sendLine(clientSocket_, "HIST " + msg);
-    sendLine(clientSocket_, "HISTORY_END");
+    try
+    {
+        pqxx::work txn(*db_->conn_);
+        pqxx::result res = txn.exec_params(
+            "SELECT u1.login AS sender, u2.login AS receiver, m.text "
+            "FROM chat.messages m "
+            "JOIN chat.users u1 ON m.sender_id = u1.id "
+            "JOIN chat.users u2 ON m.receiver_id = u2.id "
+            "WHERE (m.sender_id = $1 AND m.receiver_id = $2) OR (m.sender_id = $2 AND m.receiver_id = $1)",
+            userId, targetId);
+        for (const auto &row : res)
+        {
+            std::string msg = "[" + row[0].as<std::string>() + " to " + row[1].as<std::string>() + "]: " + row[2].as<std::string>();
+            sendLine(clientSocket_, "HIST " + msg);
+        }
+        sendLine(clientSocket_, "HISTORY_END");
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Ошибка получения истории: " << e.what() << std::endl;
+        sendLine(clientSocket_, "ERROR_DB");
+    }
 }
-
+int ClientHandler::getUserId(const std::string &login)
+{
+    try
+    {
+        pqxx::work txn(*db_->conn_);
+        pqxx::result res = txn.exec_params("SELECT id FROM chat.users WHERE login = $1", login);
+        if (!res.empty())
+        {
+            return res[0][0].as<int>();
+        }
+        return -1;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Ошибка получения ID пользователя: " << e.what() << std::endl;
+        return -1;
+    }
+}
 void ClientHandler::run()
 {
     char buf[1024];
@@ -166,7 +155,7 @@ void ClientHandler::run()
         {
             std::string u, p;
             iss >> u >> p;
-            sendLine(clientSocket_, handleRegister(u, p) ? "REGISTER_OK" : "REGISTER_ERROR");
+            handleRegister(u, p);
         }
         else if (cmd == "LOGIN")
         {
@@ -176,12 +165,7 @@ void ClientHandler::run()
             {
                 authed = true;
                 username = u;
-                sendLine(clientSocket_, "LOGIN_OK");
                 Logger::getInstance().log("User logged in: " + u);
-            }
-            else
-            {
-                sendLine(clientSocket_, "LOGIN_ERROR");
             }
         }
         else if (!authed)
@@ -190,11 +174,22 @@ void ClientHandler::run()
         }
         else if (cmd == "LIST")
         {
-            std::lock_guard<std::mutex> lk(mtx_);
-            std::string out = "USERS";
-            for (auto &kv : onlineClients_)
-                out += " " + kv.first;
-            sendLine(clientSocket_, out);
+            try
+            {
+                pqxx::work txn(*db_->conn_);
+                pqxx::result res = txn.exec("SELECT login FROM chat.users WHERE id IN (SELECT user_id FROM chat.online_status WHERE status = 'онлайн')");
+                std::string out = "USERS";
+                for (const auto &row : res)
+                {
+                    out += " " + row[0].as<std::string>();
+                }
+                sendLine(clientSocket_, out);
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Ошибка получения списка пользователей: " << e.what() << std::endl;
+                sendLine(clientSocket_, "ERROR_DB");
+            }
         }
         else if (cmd == "INBOX")
         {
@@ -223,8 +218,20 @@ void ClientHandler::run()
     }
     if (authed)
     {
-        std::lock_guard<std::mutex> lk(mtx_);
-        onlineClients_.erase(username);
+        int userId = getUserId(username);
+        if (userId != -1)
+        {
+            try
+            {
+                pqxx::work txn(*db_->conn_);
+                txn.exec_params("UPDATE chat.online_status SET status = 'оффлайн' WHERE user_id = $1", userId);
+                txn.commit();
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Ошибка обновления статуса: " << e.what() << std::endl;
+            }
+        }
         Logger::getInstance().log("User logged out: " + username);
     }
     Logger::getInstance().log("Клиент отключён socket=" + std::to_string(clientSocket_));
