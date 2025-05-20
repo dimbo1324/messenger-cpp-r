@@ -25,10 +25,8 @@ static bool _loadCreds = []()
     return true;
 }();
 ClientHandler::ClientHandler(int sock)
-    : clientSocket_(sock),
-      handlerThread_(&ClientHandler::run, this)
+    : clientSocket_(sock)
 {
-    handlerThread_.detach();
 }
 ClientHandler::~ClientHandler()
 {
@@ -95,6 +93,46 @@ void ClientHandler::handleInbox(const std::string &login)
     }
     sendLine(clientSocket_, "INBOX_END");
 }
+void ClientHandler::handleMessage(const std::string &from, const std::string &to, const std::string &text)
+{
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        std::ofstream f("history.txt", std::ios::app);
+        f << from << "|" << to << "|" << text << "\n";
+    }
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        std::ofstream f("inbox.txt", std::ios::app);
+        f << to << "|" << from << "|" << text << "\n";
+    }
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (onlineClients_.count(to))
+            sendLine(onlineClients_[to], "MESSAGE " + from + " " + text);
+    }
+    sendLine(clientSocket_, "MESSAGE_OK");
+}
+void ClientHandler::handleHistory(const std::string &login, const std::string &target)
+{
+    std::lock_guard<std::mutex> lk(mtx_);
+    std::ifstream in("history.txt");
+    std::vector<std::string> hist;
+    std::string line;
+    while (std::getline(in, line))
+    {
+        std::istringstream iss(line);
+        std::string from, to, text;
+        std::getline(iss, from, '|');
+        std::getline(iss, to, '|');
+        std::getline(iss, text);
+        if ((from == login && to == target) || (from == target && to == login))
+            hist.push_back("[" + from + " to " + to + "]: " + text);
+    }
+    in.close();
+    for (auto &msg : hist)
+        sendLine(clientSocket_, "HIST " + msg);
+    sendLine(clientSocket_, "HISTORY_END");
+}
 void ClientHandler::run()
 {
     char buf[1024];
@@ -157,21 +195,15 @@ void ClientHandler::run()
             iss >> to;
             std::string text;
             std::getline(iss, text);
-            {
-                std::lock_guard<std::mutex> lk(mtx_);
-                std::ofstream f("inbox.txt", std::ios::app);
-                f << to << "|" << username << "|" << (text.size() > 1 ? text.substr(1) : "") << "\n";
-            }
-            {
-                std::lock_guard<std::mutex> lk(mtx_);
-                if (onlineClients_.count(to))
-                    sendLine(onlineClients_[to], "MESSAGE " + username + text);
-            }
-            sendLine(clientSocket_, "MESSAGE_OK");
+            if (!text.empty() && text[0] == ' ')
+                text = text.substr(1);
+            handleMessage(username, to, text);
         }
         else if (cmd == "HISTORY")
         {
-            sendLine(clientSocket_, "HISTORY_END");
+            std::string target;
+            iss >> target;
+            handleHistory(username, target);
         }
         else
         {

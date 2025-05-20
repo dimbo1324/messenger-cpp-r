@@ -44,7 +44,7 @@ void Client::connectToServer()
         socket_.reset();
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    std::cerr << "Таймаут 60 сек — сервер недоступен.\n";
+    std::cerr << "Таймаут 60 сек — сервер недоступен.\n";
 }
 void Client::registerUser()
 {
@@ -167,6 +167,10 @@ void Client::receiveLoop()
             std::getline(iss, msg);
             std::cout << "[" << from << "]:" << msg << "\n";
         }
+        else if (cmd == "MESSAGE_OK")
+        {
+            std::cout << "Сообщение отправлено.\n";
+        }
         else if (cmd == "HIST")
         {
             std::string msg;
@@ -204,6 +208,9 @@ void Client::run()
             case 'q':
                 running_ = false;
                 break;
+            default:
+                std::cout << "Неверный выбор. Попробуйте еще раз.\n";
+                break;
             }
         }
         else
@@ -224,6 +231,10 @@ void Client::run()
                 break;
             case 'o':
                 currentUser_.clear();
+                std::cout << "Вы вышли из аккаунта.\n";
+                break;
+            default:
+                std::cout << "Неверный выбор. Попробуйте еще раз.\n";
                 break;
             }
         }

@@ -1,6 +1,7 @@
 #include "Server.h"
 #include "ClientHandler.h"
 #include "Logger.h"
+#include "threading/ThreadPool.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -12,11 +13,13 @@
 #include <cstring>
 #include <cstdlib>
 #include <iostream>
+
 Server::Server(int port)
     : port(port), serverSocket(-1)
 {
     initSocket();
 }
+
 Server::~Server()
 {
     Logger::getInstance().log("Server shutting down");
@@ -27,6 +30,7 @@ Server::~Server()
     close(serverSocket);
 #endif
 }
+
 void Server::initSocket()
 {
 #ifdef _WIN32
@@ -65,8 +69,10 @@ void Server::initSocket()
     }
     Logger::getInstance().log("Server listening on port " + std::to_string(port));
 }
+
 void Server::start()
 {
+    threading::ThreadPool pool(4);
     while (true)
     {
         sockaddr_in clientAddr{};
@@ -77,6 +83,9 @@ void Server::start()
             Logger::getInstance().log("Failed to accept client");
             continue;
         }
-        new ClientHandler(clientSock);
+        pool.enqueue([clientSock]()
+                     {
+            ClientHandler handler(clientSock);
+            handler.run(); });
     }
 }
