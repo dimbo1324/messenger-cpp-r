@@ -6,6 +6,13 @@ TARGET   := chat_server
 LIB_TCP_DIR       := ../libs/tcp
 LIB_THREADING_DIR := ../libs/threading
 
+# Список исходных файлов
+SRCS     := $(SRCDIR)/main.cpp \
+            $(SRCDIR)/Server.cpp \
+            $(SRCDIR)/ClientHandler.cpp \
+            $(SRCDIR)/Logger.cpp \
+            $(SRCDIR)/Database.cpp
+
 CXXFLAGS := -std=c++17 \
             -I$(INCDIR) \
             -I$(LIB_TCP_DIR)/include \
@@ -31,13 +38,7 @@ libs:
 	$(MAKE) -C $(LIB_THREADING_DIR)
 
 server:
-	$(CXX) $(CXXFLAGS) \
-	  -o $(TARGET) \
-	  $(SRCDIR)/main.cpp \
-	  $(SRCDIR)/Server.cpp \
-	  $(SRCDIR)/ClientHandler.cpp \
-	  $(SRCDIR)/Logger.cpp \
-	  $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
 
 run: build
 	./$(TARGET) 0.0.0.0 8080

@@ -4,6 +4,7 @@
 #include <pqxx/pqxx>
 #include <string>
 #include <vector>
+#include <memory>
 
 class Database
 {
@@ -20,7 +21,7 @@ public:
     pqxx::connection &getConnection() { return *conn_; }
 
 private:
-    pqxx::connection *conn_;
+    std::unique_ptr<pqxx::connection> conn_;
 };
 
 #endif

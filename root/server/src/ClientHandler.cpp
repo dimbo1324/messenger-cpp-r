@@ -1,12 +1,8 @@
-// src/ClientHandler.cpp
 #include "ClientHandler.h"
 #include "Logger.h"
-#include <iostream> // для std::cerr, std::endl
-#include <fstream>
+#include <iostream>
 #include <sstream>
-#include <cstring>
 #include <vector>
-#include <utility>
 #ifdef _WIN32
 #include <winsock2.h>
 #else
@@ -106,14 +102,14 @@ void ClientHandler::handleHistory(const std::string &login, const std::string &t
     try
     {
         pqxx::work txn(db_->getConnection());
-        pqxx::result res = txn.exec_params(
-            "SELECT u1.login AS sender, u2.login AS receiver, m.text "
-            "FROM chat.messages m "
-            "JOIN chat.users u1 ON m.sender_id   = u1.id "
-            "JOIN chat.users u2 ON m.receiver_id = u2.id "
-            "WHERE (m.sender_id = $1 AND m.receiver_id = $2) "
-            "   OR (m.sender_id = $2 AND m.receiver_id = $1)",
-            userId, targetId);
+        pqxx::result res = txn.exec(
+            pqxx::zview("SELECT u1.login AS sender, u2.login AS receiver, m.text "
+                        "FROM chat.messages m "
+                        "JOIN chat.users u1 ON m.sender_id = u1.id "
+                        "JOIN chat.users u2 ON m.receiver_id = u2.id "
+                        "WHERE (m.sender_id = $1 AND m.receiver_id = $2) "
+                        "OR (m.sender_id = $2 AND m.receiver_id = $1)"),
+            pqxx::params{userId, targetId});
 
         for (const auto &row : res)
         {
@@ -134,9 +130,9 @@ int ClientHandler::getUserId(const std::string &login)
     try
     {
         pqxx::work txn(db_->getConnection());
-        pqxx::result res = txn.exec_params(
-            "SELECT id FROM chat.users WHERE login = $1",
-            login);
+        pqxx::result res = txn.exec(
+            pqxx::zview("SELECT id FROM chat.users WHERE login = $1"),
+            pqxx::params{login});
         if (!res.empty())
             return res[0][0].as<int>();
         else
@@ -198,9 +194,8 @@ void ClientHandler::run()
             try
             {
                 pqxx::work txn(db_->getConnection());
-                pqxx::result res = txn.exec(
-                    "SELECT login FROM chat.users "
-                    "WHERE id IN (SELECT user_id FROM chat.online_status WHERE status = 'онлайн')");
+                pqxx::result res = txn.exec("SELECT login FROM chat.users "
+                                            "WHERE id IN (SELECT user_id FROM chat.online_status WHERE status = 'онлайн')");
 
                 std::string out = "USERS";
                 for (const auto &row : res)
@@ -248,9 +243,9 @@ void ClientHandler::run()
             try
             {
                 pqxx::work txn(db_->getConnection());
-                txn.exec_params(
-                    "UPDATE chat.online_status SET status = 'оффлайн' WHERE user_id = $1",
-                    userId);
+                txn.exec(
+                    pqxx::zview("UPDATE chat.online_status SET status = 'оффлайн' WHERE user_id = $1"),
+                    pqxx::params{userId});
                 txn.commit();
             }
             catch (const std::exception &e)
