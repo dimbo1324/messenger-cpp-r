@@ -11,9 +11,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
+
 std::mutex ClientHandler::mtx_;
 std::map<std::string, std::string> ClientHandler::credentials_;
 std::map<std::string, int> ClientHandler::onlineClients_;
+
 static bool _loadCreds = []()
 {
     std::ifstream f("credentials.txt");
@@ -24,10 +26,12 @@ static bool _loadCreds = []()
     }
     return true;
 }();
+
 ClientHandler::ClientHandler(int sock)
     : clientSocket_(sock)
 {
 }
+
 ClientHandler::~ClientHandler()
 {
 #ifdef _WIN32
@@ -36,11 +40,13 @@ ClientHandler::~ClientHandler()
     close(clientSocket_);
 #endif
 }
+
 void ClientHandler::sendLine(int sock, const std::string &line)
 {
     std::string l = line + "\n";
     ::send(sock, l.c_str(), static_cast<int>(l.size()), 0);
 }
+
 bool ClientHandler::handleRegister(const std::string &login, const std::string &pass)
 {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -51,6 +57,7 @@ bool ClientHandler::handleRegister(const std::string &login, const std::string &
     f << login << " " << pass << "\n";
     return true;
 }
+
 bool ClientHandler::handleLogin(const std::string &login, const std::string &pass)
 {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -60,6 +67,7 @@ bool ClientHandler::handleLogin(const std::string &login, const std::string &pas
     onlineClients_[login] = clientSocket_;
     return true;
 }
+
 void ClientHandler::handleInbox(const std::string &login)
 {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -93,6 +101,7 @@ void ClientHandler::handleInbox(const std::string &login)
     }
     sendLine(clientSocket_, "INBOX_END");
 }
+
 void ClientHandler::handleMessage(const std::string &from, const std::string &to, const std::string &text)
 {
     {
@@ -112,6 +121,7 @@ void ClientHandler::handleMessage(const std::string &from, const std::string &to
     }
     sendLine(clientSocket_, "MESSAGE_OK");
 }
+
 void ClientHandler::handleHistory(const std::string &login, const std::string &target)
 {
     std::lock_guard<std::mutex> lk(mtx_);
@@ -133,6 +143,7 @@ void ClientHandler::handleHistory(const std::string &login, const std::string &t
         sendLine(clientSocket_, "HIST " + msg);
     sendLine(clientSocket_, "HISTORY_END");
 }
+
 void ClientHandler::run()
 {
     char buf[1024];
@@ -214,6 +225,7 @@ void ClientHandler::run()
     {
         std::lock_guard<std::mutex> lk(mtx_);
         onlineClients_.erase(username);
+        Logger::getInstance().log("User logged out: " + username);
     }
     Logger::getInstance().log("Клиент отключён socket=" + std::to_string(clientSocket_));
 }
