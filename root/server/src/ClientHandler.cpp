@@ -1,5 +1,7 @@
+// src/ClientHandler.cpp
 #include "ClientHandler.h"
 #include "Logger.h"
+#include <iostream> // для std::cerr, std::endl
 #include <fstream>
 #include <sstream>
 #include <cstring>
@@ -11,11 +13,14 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
+
 std::mutex ClientHandler::mtx_;
+
 ClientHandler::ClientHandler(int sock, std::shared_ptr<Database> db)
     : clientSocket_(sock), db_(db)
 {
 }
+
 ClientHandler::~ClientHandler()
 {
 #ifdef _WIN32
@@ -24,11 +29,13 @@ ClientHandler::~ClientHandler()
     close(clientSocket_);
 #endif
 }
+
 void ClientHandler::sendLine(int sock, const std::string &line)
 {
     std::string l = line + "\n";
     ::send(sock, l.c_str(), static_cast<int>(l.size()), 0);
 }
+
 bool ClientHandler::handleRegister(const std::string &login, const std::string &pass)
 {
     if (db_->registerUser(login, pass))
@@ -42,6 +49,7 @@ bool ClientHandler::handleRegister(const std::string &login, const std::string &
         return false;
     }
 }
+
 bool ClientHandler::handleLogin(const std::string &login, const std::string &pass)
 {
     if (db_->loginUser(login, pass))
@@ -55,6 +63,7 @@ bool ClientHandler::handleLogin(const std::string &login, const std::string &pas
         return false;
     }
 }
+
 void ClientHandler::handleInbox(const std::string &login)
 {
     int userId = getUserId(login);
@@ -71,6 +80,7 @@ void ClientHandler::handleInbox(const std::string &login)
     }
     sendLine(clientSocket_, "INBOX_END");
 }
+
 void ClientHandler::handleMessage(const std::string &from, const std::string &to, const std::string &text)
 {
     int senderId = getUserId(from);
@@ -83,6 +93,7 @@ void ClientHandler::handleMessage(const std::string &from, const std::string &to
     db_->sendMessage(senderId, receiverId, text);
     sendLine(clientSocket_, "MESSAGE_OK");
 }
+
 void ClientHandler::handleHistory(const std::string &login, const std::string &target)
 {
     int userId = getUserId(login);
@@ -94,14 +105,16 @@ void ClientHandler::handleHistory(const std::string &login, const std::string &t
     }
     try
     {
-        pqxx::work txn(*db_->conn_);
+        pqxx::work txn(db_->getConnection());
         pqxx::result res = txn.exec_params(
             "SELECT u1.login AS sender, u2.login AS receiver, m.text "
             "FROM chat.messages m "
-            "JOIN chat.users u1 ON m.sender_id = u1.id "
+            "JOIN chat.users u1 ON m.sender_id   = u1.id "
             "JOIN chat.users u2 ON m.receiver_id = u2.id "
-            "WHERE (m.sender_id = $1 AND m.receiver_id = $2) OR (m.sender_id = $2 AND m.receiver_id = $1)",
+            "WHERE (m.sender_id = $1 AND m.receiver_id = $2) "
+            "   OR (m.sender_id = $2 AND m.receiver_id = $1)",
             userId, targetId);
+
         for (const auto &row : res)
         {
             std::string msg = "[" + row[0].as<std::string>() + " to " + row[1].as<std::string>() + "]: " + row[2].as<std::string>();
@@ -115,17 +128,19 @@ void ClientHandler::handleHistory(const std::string &login, const std::string &t
         sendLine(clientSocket_, "ERROR_DB");
     }
 }
+
 int ClientHandler::getUserId(const std::string &login)
 {
     try
     {
-        pqxx::work txn(*db_->conn_);
-        pqxx::result res = txn.exec_params("SELECT id FROM chat.users WHERE login = $1", login);
+        pqxx::work txn(db_->getConnection());
+        pqxx::result res = txn.exec_params(
+            "SELECT id FROM chat.users WHERE login = $1",
+            login);
         if (!res.empty())
-        {
             return res[0][0].as<int>();
-        }
-        return -1;
+        else
+            return -1;
     }
     catch (const std::exception &e)
     {
@@ -133,24 +148,30 @@ int ClientHandler::getUserId(const std::string &login)
         return -1;
     }
 }
+
 void ClientHandler::run()
 {
     char buf[1024];
     std::string username;
     bool authed = false;
+
     Logger::getInstance().log("Клиент подключён socket=" + std::to_string(clientSocket_));
+
     while (true)
     {
         int n = recv(clientSocket_, buf, sizeof(buf) - 1, 0);
         if (n <= 0)
             break;
         buf[n] = '\0';
+
         std::string line(buf);
         if (!line.empty() && line.back() == '\n')
             line.pop_back();
+
         std::istringstream iss(line);
         std::string cmd;
         iss >> cmd;
+
         if (cmd == "REGISTER")
         {
             std::string u, p;
@@ -176,13 +197,15 @@ void ClientHandler::run()
         {
             try
             {
-                pqxx::work txn(*db_->conn_);
-                pqxx::result res = txn.exec("SELECT login FROM chat.users WHERE id IN (SELECT user_id FROM chat.online_status WHERE status = 'онлайн')");
+                pqxx::work txn(db_->getConnection());
+                pqxx::result res = txn.exec(
+                    "SELECT login FROM chat.users "
+                    "WHERE id IN (SELECT user_id FROM chat.online_status WHERE status = 'онлайн')");
+
                 std::string out = "USERS";
                 for (const auto &row : res)
-                {
                     out += " " + row[0].as<std::string>();
-                }
+
                 sendLine(clientSocket_, out);
             }
             catch (const std::exception &e)
@@ -216,6 +239,7 @@ void ClientHandler::run()
             sendLine(clientSocket_, "UNKNOWN_CMD");
         }
     }
+
     if (authed)
     {
         int userId = getUserId(username);
@@ -223,8 +247,10 @@ void ClientHandler::run()
         {
             try
             {
-                pqxx::work txn(*db_->conn_);
-                txn.exec_params("UPDATE chat.online_status SET status = 'оффлайн' WHERE user_id = $1", userId);
+                pqxx::work txn(db_->getConnection());
+                txn.exec_params(
+                    "UPDATE chat.online_status SET status = 'оффлайн' WHERE user_id = $1",
+                    userId);
                 txn.commit();
             }
             catch (const std::exception &e)
@@ -234,5 +260,6 @@ void ClientHandler::run()
         }
         Logger::getInstance().log("User logged out: " + username);
     }
+
     Logger::getInstance().log("Клиент отключён socket=" + std::to_string(clientSocket_));
 }
