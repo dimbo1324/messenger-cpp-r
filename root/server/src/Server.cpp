@@ -17,7 +17,7 @@ Server::Server(int port)
     : port(port), serverSocket(-1)
 {
     initSocket();
-    db_ = std::make_shared<Database>("dbname=chat_db user=postgres password=your_password host=localhost port=5432");
+    db_ = std::make_shared<Database>("dbname=chat_db user=postgres password=545687 host=localhost port=5432");
 }
 Server::~Server()
 {
