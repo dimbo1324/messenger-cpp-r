@@ -43,3 +43,4 @@ ehthumbs.db
 .LSOverride
 result_*.txt
 *.py
+*.log
