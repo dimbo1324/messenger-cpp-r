@@ -1,0 +1,6 @@
+!.gitignore
+build/*
+deploy/*
+*.user
+/.vs
+/out/build/x64-Debug (default)
