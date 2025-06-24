@@ -838,17 +838,8 @@ GUI по умолчанию собран с `USE_STUB`, т. е. использу
 
 ## Контакты и поддержка
 
-- **Email разработчиков**: [example1@example.com](mailto:example1@example.com), [example2@example.com](mailto:example2@example.com)
-- **Telegram**: [@example_dev](https://t.me/example_dev)
-- **Issue tracker**: создавайте issue в репозитории с подробным описанием проблемы или предложения.
-- **PR**: присылайте чистый, документированный код, следуя стилю C++17, с тестами и описанием изменений.
-
-При создании issue указывайте:
-
-- Описание проблемы/фичи.
-- Шаги для воспроизведения (если баг).
-- Версия ОС, компилятора, Qt, PostgreSQL.
-- Логи и вывод ошибок.
+- **Email**: [dim4dmi7rij@yandex.ru](dim4dmi7rij@yandex.ru), [dimaprihodko180@gmail.com](dimaprihodko180@gmail.com)
+- **Telegram**: [@dimbo1324](https://t.me/dimbo1324)
 
 ---
 
