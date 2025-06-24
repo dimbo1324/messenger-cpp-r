@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindowServer</class>
+ <widget class="QMainWindow" name="MainWindowServer">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>686</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindowServer</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="maximumSize">
+    <size>
+     <width>16777215</width>
+     <height>643</height>
+    </size>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_2">
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <item>
+       <widget class="QTableWidget" name="tableUsers">
+        <property name="columnCount">
+         <number>4</number>
+        </property>
+        <column>
+         <property name="text">
+          <string>Login</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Status</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>ID</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Last active</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="usersControlWidget" native="true">
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QLineEdit" name="lineFilterLogin"/>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboStatusFilter">
+           <item>
+            <property name="text">
+             <string>All</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Online</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Offline</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Banned</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonRefresh">
+           <property name="text">
+            <string>Refresh</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonKickUser">
+           <property name="text">
+            <string>Kick</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonToggleBan">
+           <property name="text">
+            <string>Ban/Unban</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableWidget" name="tableMessages">
+        <column>
+         <property name="text">
+          <string>Sender</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Recipient</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Text</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Timestamp</string>
+         </property>
+        </column>
+       </widget>
+      </item>
+      <item>
+       <widget class="QWidget" name="messagesControlWidget" native="true">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QLineEdit" name="lineFilterSender"/>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineFilterReceiver"/>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="lineFilterText"/>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboFilterDate"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buttonRefreshMessages">
+           <property name="text">
+            <string>Refresh</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>800</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuMenu">
+    <property name="title">
+     <string>Menu</string>
+    </property>
+    <addaction name="actionDarkTheme"/>
+    <addaction name="actionLightTheme"/>
+   </widget>
+   <addaction name="menuMenu"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="action">
+   <property name="text">
+    <string>Меню</string>
+   </property>
+  </action>
+  <action name="actionDarkTheme">
+   <property name="text">
+    <string>Dark theme</string>
+   </property>
+  </action>
+  <action name="actionLightTheme">
+   <property name="text">
+    <string>Light theme</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
