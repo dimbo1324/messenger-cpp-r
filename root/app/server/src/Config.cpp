@@ -26,22 +26,36 @@ namespace
         return value == nullptr ? std::string{} : std::string{value};
     }
 
-    int parseInt(const std::string &value, int fallback)
+    int parseInt(const std::string &name, const std::string &value, int fallback)
     {
         if (value.empty())
         {
             return fallback;
         }
-        return std::stoi(value);
+        try
+        {
+            return std::stoi(value);
+        }
+        catch (const std::exception &e)
+        {
+            throw std::runtime_error(name + " must be an integer: " + e.what());
+        }
     }
 
-    std::size_t parseSize(const std::string &value, std::size_t fallback)
+    std::size_t parseSize(const std::string &name, const std::string &value, std::size_t fallback)
     {
         if (value.empty())
         {
             return fallback;
         }
-        return static_cast<std::size_t>(std::stoul(value));
+        try
+        {
+            return static_cast<std::size_t>(std::stoul(value));
+        }
+        catch (const std::exception &e)
+        {
+            throw std::runtime_error(name + " must be a positive integer: " + e.what());
+        }
     }
 
     std::unordered_map<std::string, std::string> readConfigFile(const std::string &path)
@@ -98,11 +112,11 @@ ServerConfig loadServerConfig()
 
     ServerConfig config;
     config.dbConn = setting(fileConfig, "CHAT_DB_CONN", "db_conn");
-    config.port = parseInt(setting(fileConfig, "CHAT_SERVER_PORT", "server_port"), config.port);
-    config.dbPoolSize = parseSize(setting(fileConfig, "CHAT_DB_POOL_SIZE", "db_pool_size"), config.dbPoolSize);
-    config.maxClients = parseInt(setting(fileConfig, "CHAT_MAX_CLIENTS", "max_clients"), config.maxClients);
-    config.readTimeoutSeconds = parseInt(setting(fileConfig, "CHAT_READ_TIMEOUT_SEC", "read_timeout_sec"), config.readTimeoutSeconds);
-    config.maxFrameSize = parseSize(setting(fileConfig, "CHAT_MAX_FRAME_SIZE", "max_frame_size"), config.maxFrameSize);
+    config.port = parseInt("CHAT_SERVER_PORT", setting(fileConfig, "CHAT_SERVER_PORT", "server_port"), config.port);
+    config.dbPoolSize = parseSize("CHAT_DB_POOL_SIZE", setting(fileConfig, "CHAT_DB_POOL_SIZE", "db_pool_size"), config.dbPoolSize);
+    config.maxClients = parseInt("CHAT_MAX_CLIENTS", setting(fileConfig, "CHAT_MAX_CLIENTS", "max_clients"), config.maxClients);
+    config.readTimeoutSeconds = parseInt("CHAT_READ_TIMEOUT_SEC", setting(fileConfig, "CHAT_READ_TIMEOUT_SEC", "read_timeout_sec"), config.readTimeoutSeconds);
+    config.maxFrameSize = parseSize("CHAT_MAX_FRAME_SIZE", setting(fileConfig, "CHAT_MAX_FRAME_SIZE", "max_frame_size"), config.maxFrameSize);
     config.logPath = setting(fileConfig, "CHAT_LOG_PATH", "log_path", config.logPath);
     config.tlsCertPath = setting(fileConfig, "CHAT_TLS_CERT", "tls_cert");
     config.tlsKeyPath = setting(fileConfig, "CHAT_TLS_KEY", "tls_key");
@@ -118,9 +132,17 @@ ServerConfig loadServerConfig()
     {
         throw std::runtime_error("CHAT_DB_POOL_SIZE must be greater than zero");
     }
+    if (config.port <= 0 || config.port > 65535)
+    {
+        throw std::runtime_error("CHAT_SERVER_PORT must be in range 1-65535");
+    }
     if (config.maxClients <= 0)
     {
         throw std::runtime_error("CHAT_MAX_CLIENTS must be greater than zero");
+    }
+    if (config.readTimeoutSeconds <= 0)
+    {
+        throw std::runtime_error("CHAT_READ_TIMEOUT_SEC must be greater than zero");
     }
     if (config.maxFrameSize < 1024)
     {

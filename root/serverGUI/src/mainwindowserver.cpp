@@ -386,10 +386,10 @@ bool MainWindowServer::readFrame(QTcpSocket &socket, QString *payload, int timeo
         header.append(socket.read(4 - header.size()));
     }
 
-    const auto b0 = static_cast<quint8>(header[0]);
-    const auto b1 = static_cast<quint8>(header[1]);
-    const auto b2 = static_cast<quint8>(header[2]);
-    const auto b3 = static_cast<quint8>(header[3]);
+    const auto b0 = static_cast<quint8>(static_cast<unsigned char>(header.at(0)));
+    const auto b1 = static_cast<quint8>(static_cast<unsigned char>(header.at(1)));
+    const auto b2 = static_cast<quint8>(static_cast<unsigned char>(header.at(2)));
+    const auto b3 = static_cast<quint8>(static_cast<unsigned char>(header.at(3)));
     const quint32 size = (static_cast<quint32>(b0) << 24) |
                          (static_cast<quint32>(b1) << 16) |
                          (static_cast<quint32>(b2) << 8) |

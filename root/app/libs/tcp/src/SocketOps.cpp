@@ -150,9 +150,9 @@ namespace tcp
         return true;
     }
 
-    bool sendFrame(SocketHandle socket, const std::string &payload)
+    bool sendFrame(SocketHandle socket, const std::string &payload, std::size_t maxFrameSize)
     {
-        if (payload.size() > kDefaultMaxFrameSize)
+        if (payload.size() > maxFrameSize)
         {
             return false;
         }

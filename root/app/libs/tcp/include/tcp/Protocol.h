@@ -47,7 +47,9 @@ namespace tcp
     };
 
     bool sendAll(ISocket &socket, const char *data, std::size_t length);
-    bool sendFrame(ISocket &socket, const std::string &payload);
+    bool sendFrame(ISocket &socket,
+                   const std::string &payload,
+                   std::size_t maxFrameSize = kDefaultMaxFrameSize);
     ReceiveFrameStatus receiveFrame(ISocket &socket,
                                     std::string &payload,
                                     std::size_t maxFrameSize = kDefaultMaxFrameSize);

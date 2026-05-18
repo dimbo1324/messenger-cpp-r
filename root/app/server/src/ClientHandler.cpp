@@ -93,7 +93,7 @@ void ClientHandler::disconnectFromAdmin()
 bool ClientHandler::sendResponse(const std::string &payload)
 {
     std::lock_guard<std::mutex> lock(sendMutex_);
-    return tcp::sendFrame(clientSocket_, payload);
+    return tcp::sendFrame(clientSocket_, payload, maxFrameSize_);
 }
 
 bool ClientHandler::requireAuth()
@@ -113,6 +113,11 @@ bool ClientHandler::requireModerator()
         return false;
     }
     if (role_ != "admin" && role_ != "moderator")
+    {
+        sendResponse("ERROR_FORBIDDEN moderator role required");
+        return false;
+    }
+    if (!db_->hasModeratorRights(userId_))
     {
         sendResponse("ERROR_FORBIDDEN moderator role required");
         return false;

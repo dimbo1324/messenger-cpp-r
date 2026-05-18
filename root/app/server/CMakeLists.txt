@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.21)
 project(chat_server LANGUAGES CXX)
 
+add_library(server_auth
+    src/Auth.cpp
+)
+
+target_include_directories(server_auth PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+if(TARGET project_options)
+    target_link_libraries(server_auth PUBLIC project_options)
+endif()
+
 find_package(libpqxx CONFIG QUIET)
 if(NOT libpqxx_FOUND)
     find_package(PkgConfig REQUIRED)
@@ -8,7 +20,6 @@ if(NOT libpqxx_FOUND)
 endif()
 
 add_library(server_core
-    src/Auth.cpp
     src/Config.cpp
     src/Server.cpp
     src/ClientHandler.cpp
@@ -22,6 +33,7 @@ target_include_directories(server_core PUBLIC
 )
 
 target_link_libraries(server_core PUBLIC
+    server_auth
     tcp
     threading
 )

@@ -3,9 +3,9 @@
 
 INSERT INTO chat.users (login, password_hash, role, status)
 VALUES
-    ('alice', '$2a$12$abcdefghijklmnopqrstuvabcdefghijklmnopqrstuvwxy123456', 'user', 'offline'),
-    ('bob', '$2a$12$abcdefghijklmnopqrstuvabcdefghijklmnopqrstuvwxy123456', 'moderator', 'offline'),
-    ('carol', '$2a$12$abcdefghijklmnopqrstuvabcdefghijklmnopqrstuvwxy123456', 'user', 'banned')
+    ('alice', crypt('AliceDev12345', gen_salt('bf', 12)), 'user', 'offline'),
+    ('bob', crypt('BobDev12345', gen_salt('bf', 12)), 'moderator', 'offline'),
+    ('carol', crypt('CarolDev12345', gen_salt('bf', 12)), 'user', 'banned')
 ON CONFLICT (login) DO NOTHING;
 
 INSERT INTO chat.messages (sender_id, receiver_id, text)

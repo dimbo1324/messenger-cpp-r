@@ -29,7 +29,9 @@ namespace tcp
     bool setNoSigPipe(SocketHandle socket);
 
     bool sendAll(SocketHandle socket, const char *data, std::size_t length);
-    bool sendFrame(SocketHandle socket, const std::string &payload);
+    bool sendFrame(SocketHandle socket,
+                   const std::string &payload,
+                   std::size_t maxFrameSize = kDefaultMaxFrameSize);
     ReceiveFrameStatus receiveFrame(SocketHandle socket,
                                     std::string &payload,
                                     std::size_t maxFrameSize = kDefaultMaxFrameSize);
