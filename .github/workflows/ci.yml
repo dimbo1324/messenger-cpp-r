@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ pkg-config libpqxx-dev postgresql-client
+      - name: Configure
+        run: cmake -S . -B build -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_WARNINGS=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install libpqxx with vcpkg
+        run: vcpkg install libpqxx:x64-windows
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_WARNINGS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure

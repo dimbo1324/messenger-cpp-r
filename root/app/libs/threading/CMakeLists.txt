@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.21)
 project(threading LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -15,5 +15,9 @@ target_include_directories(threading PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+if(TARGET project_options)
+    target_link_libraries(threading PUBLIC project_options)
+endif()
 
 add_library(threading::threading ALIAS threading)

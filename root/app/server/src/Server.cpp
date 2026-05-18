@@ -1,88 +1,125 @@
 #include "Server.h"
 #include "ClientHandler.h"
 #include "Logger.h"
-#include "threading/ThreadPool.h"
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#endif
-#include <cstring>
+
 #include <cstdlib>
 #include <iostream>
-Server::Server(int port)
-    : port(port), serverSocket(-1)
+#include <stdexcept>
+#include <thread>
+#include <utility>
+
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#else
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
+
+Server::Server(ServerConfig config)
+    : config_(std::move(config)),
+      db_(std::make_shared<Database>(config_.dbConn, config_.dbPoolSize)),
+      sessions_(std::make_shared<SessionRegistry>())
 {
+    Logger::getInstance().configure(config_.logPath);
+    if (!db_->ping())
+    {
+        throw std::runtime_error("database is not reachable");
+    }
     initSocket();
-    db_ = std::make_shared<Database>("dbname=chat_db user=postgres password=545687 host=localhost port=5432");
 }
+
 Server::~Server()
 {
-    Logger::getInstance().log("Server shutting down");
+    Logger::getInstance().info("server shutting down");
+    tcp::closeSocket(serverSocket_);
 #ifdef _WIN32
-    closesocket(serverSocket);
     WSACleanup();
-#else
-    close(serverSocket);
 #endif
 }
+
 void Server::initSocket()
 {
 #ifdef _WIN32
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
     {
-        std::cerr << "WSAStartup failed\n";
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("WSAStartup failed");
     }
 #endif
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0)
+
+    serverSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (!tcp::isValidSocket(serverSocket_))
     {
-        perror("socket");
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("failed to create server socket");
     }
+
+    tcp::setReuseAddress(serverSocket_);
+    tcp::setNoSigPipe(serverSocket_);
+
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(static_cast<uint16_t>(port));
-    addr.sin_addr.s_addr = INADDR_ANY;
-    int opt = 1;
-#ifdef _WIN32
-    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
-#else
-    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-#endif
-    if (bind(serverSocket, (sockaddr *)&addr, sizeof(addr)) < 0)
+    addr.sin_port = htons(static_cast<uint16_t>(config_.port));
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (::bind(serverSocket_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0)
     {
-        perror("bind");
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("failed to bind server socket");
     }
-    if (listen(serverSocket, 10) < 0)
+
+    if (::listen(serverSocket_, config_.maxClients) < 0)
     {
-        perror("listen");
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("failed to listen on server socket");
     }
-    Logger::getInstance().log("Server listening on port " + std::to_string(port));
+
+    Logger::getInstance().info("server listening on port " + std::to_string(config_.port));
+    if (config_.tlsEnabled)
+    {
+        Logger::getInstance().warn("TLS is configured but the current transport is still plaintext TCP");
+    }
 }
+
 void Server::start()
 {
-    threading::ThreadPool pool(4);
     while (true)
     {
         sockaddr_in clientAddr{};
+#ifdef _WIN32
+        int len = sizeof(clientAddr);
+#else
         socklen_t len = sizeof(clientAddr);
-        int clientSock = accept(serverSocket, (sockaddr *)&clientAddr, &len);
-        if (clientSock < 0)
+#endif
+        const tcp::SocketHandle clientSock = ::accept(serverSocket_,
+                                                      reinterpret_cast<sockaddr *>(&clientAddr),
+                                                      &len);
+        if (!tcp::isValidSocket(clientSock))
         {
-            Logger::getInstance().log("Failed to accept client");
+            Logger::getInstance().warn("failed to accept client");
             continue;
         }
-        pool.enqueue([clientSock, db = db_]()
-                     {
-ClientHandler handler(clientSock, db);
-handler.run(); });
+
+        if (activeClients_.load() >= config_.maxClients)
+        {
+            tcp::sendFrame(clientSock, "ERROR_SERVER_BUSY");
+            tcp::closeSocket(clientSock);
+            Logger::getInstance().warn("client rejected: max client limit reached");
+            continue;
+        }
+
+        tcp::setReceiveTimeout(clientSock, config_.readTimeoutSeconds);
+        tcp::setNoSigPipe(clientSock);
+        activeClients_.fetch_add(1);
+
+        std::thread([this, clientSock]() {
+            try
+            {
+                ClientHandler handler(clientSock, db_, sessions_, config_.maxFrameSize);
+                handler.run();
+            }
+            catch (const std::exception &e)
+            {
+                Logger::getInstance().error(std::string("client handler crashed: ") + e.what());
+            }
+            activeClients_.fetch_sub(1);
+        }).detach();
     }
 }

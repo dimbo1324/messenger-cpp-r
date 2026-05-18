@@ -1,260 +1,408 @@
 #include "ClientHandler.h"
 #include "Logger.h"
-#include <iostream>
+
+#include <algorithm>
 #include <sstream>
+#include <utility>
 #include <vector>
-#ifdef _WIN32
-#include <winsock2.h>
-#else
-#include <sys/socket.h>
-#include <unistd.h>
-#endif
 
-std::mutex ClientHandler::mtx_;
+namespace
+{
+    std::string statusToText(DbStatus status)
+    {
+        switch (status)
+        {
+        case DbStatus::Ok:
+            return "OK";
+        case DbStatus::ValidationError:
+            return "VALIDATION";
+        case DbStatus::Unauthorized:
+            return "UNAUTHORIZED";
+        case DbStatus::Forbidden:
+            return "FORBIDDEN";
+        case DbStatus::NotFound:
+            return "NOT_FOUND";
+        case DbStatus::Duplicate:
+            return "DUPLICATE";
+        case DbStatus::Banned:
+            return "BANNED";
+        case DbStatus::Error:
+            return "DB";
+        }
+        return "ERROR";
+    }
 
-ClientHandler::ClientHandler(int sock, std::shared_ptr<Database> db)
-    : clientSocket_(sock), db_(db)
+    std::string tail(std::istringstream &iss)
+    {
+        std::string value;
+        std::getline(iss, value);
+        if (!value.empty() && value.front() == ' ')
+        {
+            value.erase(value.begin());
+        }
+        return value;
+    }
+
+    int parseIntOrDefault(const std::string &value, int fallback)
+    {
+        if (value.empty())
+        {
+            return fallback;
+        }
+        try
+        {
+            return std::stoi(value);
+        }
+        catch (...)
+        {
+            return fallback;
+        }
+    }
+}
+
+ClientHandler::ClientHandler(tcp::SocketHandle clientSocket,
+                             std::shared_ptr<Database> db,
+                             std::shared_ptr<SessionRegistry> sessions,
+                             std::size_t maxFrameSize)
+    : clientSocket_(clientSocket),
+      db_(std::move(db)),
+      sessions_(std::move(sessions)),
+      maxFrameSize_(maxFrameSize)
 {
 }
 
 ClientHandler::~ClientHandler()
 {
-#ifdef _WIN32
-    closesocket(clientSocket_);
-#else
-    close(clientSocket_);
-#endif
+    cleanupSession();
+    tcp::closeSocket(clientSocket_);
+    clientSocket_ = tcp::kInvalidSocket;
 }
 
-void ClientHandler::sendLine(int sock, const std::string &line)
+bool ClientHandler::deliverFrame(const std::string &payload)
 {
-    std::string l = line + "\n";
-    ::send(sock, l.c_str(), static_cast<int>(l.size()), 0);
+    return sendResponse(payload);
+}
+
+void ClientHandler::disconnectFromAdmin()
+{
+    sendResponse("KICKED");
+    tcp::closeSocket(clientSocket_);
+    clientSocket_ = tcp::kInvalidSocket;
+}
+
+bool ClientHandler::sendResponse(const std::string &payload)
+{
+    std::lock_guard<std::mutex> lock(sendMutex_);
+    return tcp::sendFrame(clientSocket_, payload);
+}
+
+bool ClientHandler::requireAuth()
+{
+    if (!authed_)
+    {
+        sendResponse("ERROR_NOT_AUTH");
+        return false;
+    }
+    return true;
+}
+
+bool ClientHandler::requireModerator()
+{
+    if (!requireAuth())
+    {
+        return false;
+    }
+    if (role_ != "admin" && role_ != "moderator")
+    {
+        sendResponse("ERROR_FORBIDDEN moderator role required");
+        return false;
+    }
+    return true;
 }
 
 bool ClientHandler::handleRegister(const std::string &login, const std::string &pass)
 {
-    if (db_->registerUser(login, pass))
+    const auto result = db_->registerUser(login, pass);
+    if (result.status == DbStatus::Ok)
     {
-        sendLine(clientSocket_, "REGISTER_OK");
+        sendResponse("REGISTER_OK");
         return true;
     }
-    else
-    {
-        sendLine(clientSocket_, "REGISTER_ERROR");
-        return false;
-    }
+
+    sendResponse("REGISTER_ERROR " + statusToText(result.status) + " " + result.message);
+    return false;
 }
 
 bool ClientHandler::handleLogin(const std::string &login, const std::string &pass)
 {
-    if (db_->loginUser(login, pass))
+    const auto result = db_->loginUser(login, pass);
+    if (result.status != DbStatus::Ok)
     {
-        sendLine(clientSocket_, "LOGIN_OK");
-        return true;
-    }
-    else
-    {
-        sendLine(clientSocket_, "LOGIN_ERROR");
+        sendResponse("LOGIN_ERROR " + statusToText(result.status) + " " + result.message);
         return false;
     }
+
+    cleanupSession();
+    authed_ = true;
+    userId_ = result.userId;
+    username_ = result.login;
+    role_ = result.role;
+    sessions_->addSession(userId_, this);
+    sendResponse("LOGIN_OK " + role_);
+    return true;
 }
 
-void ClientHandler::handleInbox(const std::string &login)
+void ClientHandler::handleLogout()
 {
-    int userId = getUserId(login);
-    if (userId == -1)
+    if (!authed_)
     {
-        sendLine(clientSocket_, "ERROR_USER_NOT_FOUND");
+        sendResponse("LOGOUT_OK");
         return;
     }
-    std::vector<std::string> messages = db_->getInbox(userId);
-    sendLine(clientSocket_, "INBOX_COUNT " + std::to_string(messages.size()));
-    for (const auto &msg : messages)
-    {
-        sendLine(clientSocket_, "INBOX_MSG " + msg);
-    }
-    sendLine(clientSocket_, "INBOX_END");
+    cleanupSession();
+    sendResponse("LOGOUT_OK");
 }
 
-void ClientHandler::handleMessage(const std::string &from, const std::string &to, const std::string &text)
+void ClientHandler::handleList()
 {
-    int senderId = getUserId(from);
-    int receiverId = getUserId(to);
-    if (senderId == -1 || receiverId == -1)
+    if (!requireAuth())
     {
-        sendLine(clientSocket_, "ERROR_USER_NOT_FOUND");
         return;
     }
-    db_->sendMessage(senderId, receiverId, text);
-    sendLine(clientSocket_, "MESSAGE_OK");
+
+    sendResponse("USERS_BEGIN");
+    for (const auto &user : db_->listUsers())
+    {
+        sendResponse("USER " + user.login + " " + user.status + " " + user.role + " " + user.lastSeen);
+    }
+    sendResponse("USERS_END");
 }
 
-void ClientHandler::handleHistory(const std::string &login, const std::string &target)
+void ClientHandler::handleInbox()
 {
-    int userId = getUserId(login);
-    int targetId = getUserId(target);
-    if (userId == -1 || targetId == -1)
+    if (!requireAuth())
     {
-        sendLine(clientSocket_, "ERROR_USER_NOT_FOUND");
         return;
     }
-    try
-    {
-        pqxx::work txn(db_->getConnection());
-        pqxx::result res = txn.exec(
-            pqxx::zview("SELECT u1.login AS sender, u2.login AS receiver, m.text "
-                        "FROM chat.messages m "
-                        "JOIN chat.users u1 ON m.sender_id = u1.id "
-                        "JOIN chat.users u2 ON m.receiver_id = u2.id "
-                        "WHERE (m.sender_id = $1 AND m.receiver_id = $2) "
-                        "OR (m.sender_id = $2 AND m.receiver_id = $1)"),
-            pqxx::params{userId, targetId});
 
-        for (const auto &row : res)
+    sendResponse("INBOX_BEGIN");
+    for (const auto &msg : db_->getInbox(userId_, 100))
+    {
+        sendResponse("INBOX_MSG " + msg.sender + " " + msg.createdAt + " " + msg.text);
+    }
+    sendResponse("INBOX_END");
+}
+
+void ClientHandler::handleMessage(const std::string &to, const std::string &text)
+{
+    if (!requireAuth())
+    {
+        return;
+    }
+
+    const auto result = db_->sendMessage(userId_, to, text);
+    if (result.status != DbStatus::Ok)
+    {
+        sendResponse("MESSAGE_ERROR " + statusToText(result.status) + " " + result.message);
+        return;
+    }
+
+    sendResponse("MESSAGE_OK " + std::to_string(result.id));
+    const auto receiver = db_->getUserByLogin(to);
+    if (receiver)
+    {
+        sessions_->deliverToUser(receiver->id, "MESSAGE " + username_ + " " + text);
+    }
+}
+
+void ClientHandler::handleHistory(const std::string &target, int limit, int offset)
+{
+    if (!requireAuth())
+    {
+        return;
+    }
+
+    sendResponse("HISTORY_BEGIN");
+    for (const auto &msg : db_->getHistory(userId_, target, limit, offset))
+    {
+        sendResponse("HIST " + msg.sender + " " + msg.receiver + " " + msg.createdAt + " " + msg.text);
+    }
+    sendResponse("HISTORY_END");
+}
+
+void ClientHandler::handleAllMessages(int limit)
+{
+    if (!requireModerator())
+    {
+        return;
+    }
+
+    sendResponse("ALL_MESSAGES_BEGIN");
+    for (const auto &msg : db_->getAllMessages(limit))
+    {
+        sendResponse("MSG " + msg.sender + " " + msg.receiver + " " + msg.createdAt + " " + msg.text);
+    }
+    sendResponse("ALL_MESSAGES_END");
+}
+
+void ClientHandler::handleBan(const std::string &login)
+{
+    if (!requireModerator())
+    {
+        return;
+    }
+    const auto result = db_->banUser(userId_, login);
+    if (result.status == DbStatus::Ok)
+    {
+        if (result.id >= 0)
         {
-            std::string msg = "[" + row[0].as<std::string>() + " to " + row[1].as<std::string>() + "]: " + row[2].as<std::string>();
-            sendLine(clientSocket_, "HIST " + msg);
+            sessions_->disconnectUser(result.id);
         }
-        sendLine(clientSocket_, "HISTORY_END");
+        sendResponse("OK");
+        return;
     }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Ошибка получения истории: " << e.what() << std::endl;
-        sendLine(clientSocket_, "ERROR_DB");
-    }
+    sendResponse("ERROR_" + statusToText(result.status) + " " + result.message);
 }
 
-int ClientHandler::getUserId(const std::string &login)
+void ClientHandler::handleUnban(const std::string &login)
 {
-    try
+    if (!requireModerator())
     {
-        pqxx::work txn(db_->getConnection());
-        pqxx::result res = txn.exec(
-            pqxx::zview("SELECT id FROM chat.users WHERE login = $1"),
-            pqxx::params{login});
-        if (!res.empty())
-            return res[0][0].as<int>();
-        else
-            return -1;
+        return;
     }
-    catch (const std::exception &e)
+    const auto result = db_->unbanUser(userId_, login);
+    sendResponse(result.status == DbStatus::Ok ? "OK" : "ERROR_" + statusToText(result.status) + " " + result.message);
+}
+
+void ClientHandler::handleKick(const std::string &login)
+{
+    if (!requireModerator())
     {
-        std::cerr << "Ошибка получения ID пользователя: " << e.what() << std::endl;
-        return -1;
+        return;
     }
+    const auto result = db_->kickUser(userId_, login);
+    if (result.status != DbStatus::Ok)
+    {
+        sendResponse("ERROR_" + statusToText(result.status) + " " + result.message);
+        return;
+    }
+
+    const std::size_t kicked = sessions_->disconnectUser(result.id);
+    sendResponse(kicked > 0 ? "OK" : "ERROR_NOT_FOUND active session not found");
+}
+
+void ClientHandler::cleanupSession()
+{
+    if (!authed_)
+    {
+        return;
+    }
+    sessions_->removeSession(userId_, this);
+    db_->logoutUser(userId_);
+    Logger::getInstance().info("user logged out: " + username_);
+    authed_ = false;
+    userId_ = -1;
+    username_.clear();
+    role_.clear();
 }
 
 void ClientHandler::run()
 {
-    char buf[1024];
-    std::string username;
-    bool authed = false;
-
-    Logger::getInstance().log("Клиент подключён socket=" + std::to_string(clientSocket_));
+    Logger::getInstance().info("client connected");
 
     while (true)
     {
-        int n = recv(clientSocket_, buf, sizeof(buf) - 1, 0);
-        if (n <= 0)
+        std::string frame;
+        const auto status = tcp::receiveFrame(clientSocket_, frame, maxFrameSize_);
+        if (status == tcp::ReceiveFrameStatus::Closed)
+        {
             break;
-        buf[n] = '\0';
+        }
+        if (status == tcp::ReceiveFrameStatus::TooLarge)
+        {
+            sendResponse("ERROR_FRAME_TOO_LARGE");
+            break;
+        }
+        if (status != tcp::ReceiveFrameStatus::Ok)
+        {
+            Logger::getInstance().warn("client frame read failed");
+            break;
+        }
 
-        std::string line(buf);
-        if (!line.empty() && line.back() == '\n')
-            line.pop_back();
-
-        std::istringstream iss(line);
+        std::istringstream iss(frame);
         std::string cmd;
         iss >> cmd;
 
         if (cmd == "REGISTER")
         {
-            std::string u, p;
-            iss >> u >> p;
-            handleRegister(u, p);
+            std::string login;
+            std::string pass;
+            iss >> login >> pass;
+            handleRegister(login, pass);
         }
         else if (cmd == "LOGIN")
         {
-            std::string u, p;
-            iss >> u >> p;
-            if (handleLogin(u, p))
-            {
-                authed = true;
-                username = u;
-                Logger::getInstance().log("User logged in: " + u);
-            }
+            std::string login;
+            std::string pass;
+            iss >> login >> pass;
+            handleLogin(login, pass);
         }
-        else if (!authed)
+        else if (cmd == "LOGOUT")
         {
-            sendLine(clientSocket_, "ERROR_NOT_AUTH");
+            handleLogout();
         }
         else if (cmd == "LIST")
         {
-            try
-            {
-                pqxx::work txn(db_->getConnection());
-                pqxx::result res = txn.exec("SELECT login FROM chat.users "
-                                            "WHERE id IN (SELECT user_id FROM chat.online_status WHERE status = 'онлайн')");
-
-                std::string out = "USERS";
-                for (const auto &row : res)
-                    out += " " + row[0].as<std::string>();
-
-                sendLine(clientSocket_, out);
-            }
-            catch (const std::exception &e)
-            {
-                std::cerr << "Ошибка получения списка пользователей: " << e.what() << std::endl;
-                sendLine(clientSocket_, "ERROR_DB");
-            }
+            handleList();
         }
         else if (cmd == "INBOX")
         {
-            handleInbox(username);
+            handleInbox();
         }
         else if (cmd == "MESSAGE")
         {
             std::string to;
             iss >> to;
-            std::string text;
-            std::getline(iss, text);
-            if (!text.empty() && text[0] == ' ')
-                text = text.substr(1);
-            handleMessage(username, to, text);
+            handleMessage(to, tail(iss));
         }
         else if (cmd == "HISTORY")
         {
             std::string target;
-            iss >> target;
-            handleHistory(username, target);
+            std::string limitText;
+            std::string offsetText;
+            iss >> target >> limitText >> offsetText;
+            handleHistory(target, parseIntOrDefault(limitText, 50), parseIntOrDefault(offsetText, 0));
+        }
+        else if (cmd == "ALL_MESSAGES")
+        {
+            std::string limitText;
+            iss >> limitText;
+            handleAllMessages(parseIntOrDefault(limitText, 100));
+        }
+        else if (cmd == "BAN")
+        {
+            std::string login;
+            iss >> login;
+            handleBan(login);
+        }
+        else if (cmd == "UNBAN")
+        {
+            std::string login;
+            iss >> login;
+            handleUnban(login);
+        }
+        else if (cmd == "KICK")
+        {
+            std::string login;
+            iss >> login;
+            handleKick(login);
         }
         else
         {
-            sendLine(clientSocket_, "UNKNOWN_CMD");
+            sendResponse("UNKNOWN_CMD");
         }
     }
 
-    if (authed)
-    {
-        int userId = getUserId(username);
-        if (userId != -1)
-        {
-            try
-            {
-                pqxx::work txn(db_->getConnection());
-                txn.exec(
-                    pqxx::zview("UPDATE chat.online_status SET status = 'оффлайн' WHERE user_id = $1"),
-                    pqxx::params{userId});
-                txn.commit();
-            }
-            catch (const std::exception &e)
-            {
-                std::cerr << "Ошибка обновления статуса: " << e.what() << std::endl;
-            }
-        }
-        Logger::getInstance().log("User logged out: " + username);
-    }
-
-    Logger::getInstance().log("Клиент отключён socket=" + std::to_string(clientSocket_));
+    cleanupSession();
+    Logger::getInstance().info("client disconnected");
 }

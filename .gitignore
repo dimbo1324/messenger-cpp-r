@@ -1,3 +1,25 @@
+# Build outputs
+build/
+build-*/
+cmake-build-*/
+out/
+bin/
+lib/
+dist/
+deploy/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+DartConfiguration.tcl
+
+# Compiled objects and binaries
 *.o
 *.obj
 *.lo
@@ -15,40 +37,62 @@
 *.exe
 *.out
 *.app
-CMakeCache.txt
-CMakeFiles/
-CMakeScripts/
-cmake_install.cmake
-install_manifest.txt
-# Makefile
-build/
-bin/
-# .vscode/
+*.pdb
+*.ilk
+*.exp
+
+# Qt generated/user files
+*.pro.user*
+*.qmake.stash
+*.qmlproject.user*
+*_autogen/
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# IDE/editor files
+.vs/
+.vscode/
+.idea/
+*.iml
 *.sdf
 *.opensdf
 *.VC.db
 *.VC.opendb
-.vs/
-.idea/
-*.iml
-cmake-build-*/
-*.pro.user*
-*.qmake.stash
-*.qmlproject.user*
+*.user
+*.suo
+
+# OS files
 [Dd]esktop.ini
 Thumbs.db
 ehthumbs.db
 .DS_Store
 .AppleDouble
 .LSOverride
-result_*.txt
-*.py
-*.log
-recomends.md
 
-!.gitignore
-build/*
-deploy/*
-*.user
-/.vs
-/out/build/x64-Debug (default)
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+config/*.conf
+config/*.local
+*.pem
+*.key
+*.crt
+
+# Runtime outputs
+logs/
+*.log
+result_*.txt
+coverage/
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.bak
+recomends.md

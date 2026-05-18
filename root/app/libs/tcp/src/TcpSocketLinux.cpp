@@ -1,7 +1,9 @@
 #if !defined(_WIN32)
 #include "tcp/TcpSocketLinux.h"
+#include <cerrno>
 #include <cstring>
 #include <stdexcept>
+#include <netdb.h>
 namespace tcp
 {
     TcpSocketLinux::TcpSocketLinux() : sockfd_(-1) {}
@@ -29,17 +31,31 @@ namespace tcp
             return false;
         }
 #endif
-        sockaddr_in addr;
-        std::memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(static_cast<uint16_t>(port));
-        if (::inet_pton(AF_INET, host.c_str(), &addr.sin_addr) <= 0)
+        addrinfo hints{};
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+
+        addrinfo *result = nullptr;
+        const std::string service = std::to_string(port);
+        if (::getaddrinfo(host.c_str(), service.c_str(), &hints, &result) != 0)
         {
             ::close(sockfd_);
             sockfd_ = -1;
             return false;
         }
-        if (::connect(sockfd_, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0)
+
+        bool connected = false;
+        for (addrinfo *rp = result; rp != nullptr; rp = rp->ai_next)
+        {
+            if (::connect(sockfd_, rp->ai_addr, rp->ai_addrlen) == 0)
+            {
+                connected = true;
+                break;
+            }
+        }
+        ::freeaddrinfo(result);
+
+        if (!connected)
         {
             ::close(sockfd_);
             sockfd_ = -1;
@@ -53,7 +69,11 @@ namespace tcp
         {
             return 0;
         }
-        ssize_t bytes_sent = ::send(sockfd_, data, length, 0);
+        int flags = 0;
+#ifdef MSG_NOSIGNAL
+        flags |= MSG_NOSIGNAL;
+#endif
+        ssize_t bytes_sent = ::send(sockfd_, data, length, flags);
         if (bytes_sent < 0)
         {
             return 0;

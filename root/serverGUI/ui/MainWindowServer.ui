@@ -40,7 +40,7 @@
         </column>
         <column>
          <property name="text">
-          <string>ID</string>
+          <string>Role</string>
          </property>
         </column>
         <column>

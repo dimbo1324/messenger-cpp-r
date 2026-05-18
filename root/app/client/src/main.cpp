@@ -7,8 +7,10 @@
 #endif
 int main(int argc, char *argv[])
 {
+#ifdef _WIN32
     SetConsoleCP(65001);
     SetConsoleOutputCP(65001);
+#endif
     if (argc != 2)
     {
         std::cerr << "Использование: chat_client <хост:порт>\n";
