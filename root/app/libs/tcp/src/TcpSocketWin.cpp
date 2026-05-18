@@ -1,5 +1,6 @@
 #if defined(_WIN32)
 #include "tcp/TcpSocketWin.h"
+#include <climits>
 #include <stdexcept>
 namespace tcp
 {
@@ -37,16 +38,32 @@ namespace tcp
         {
             return false;
         }
-        sockaddr_in addr = {};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(static_cast<USHORT>(port));
-        if (::InetPtonA(AF_INET, host.c_str(), &addr.sin_addr) != 1)
+        addrinfo hints{};
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        addrinfo *result = nullptr;
+        const std::string service = std::to_string(port);
+        if (::getaddrinfo(host.c_str(), service.c_str(), &hints, &result) != 0)
         {
             ::closesocket(sock_);
             sock_ = INVALID_SOCKET;
             return false;
         }
-        if (::connect(sock_, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == SOCKET_ERROR)
+
+        bool connected = false;
+        for (addrinfo *rp = result; rp != nullptr; rp = rp->ai_next)
+        {
+            if (::connect(sock_, rp->ai_addr, static_cast<int>(rp->ai_addrlen)) == 0)
+            {
+                connected = true;
+                break;
+            }
+        }
+        ::freeaddrinfo(result);
+
+        if (!connected)
         {
             ::closesocket(sock_);
             sock_ = INVALID_SOCKET;

@@ -1,294 +1,279 @@
 # C++ Messenger
 
-[![C++ Standard](https://img.shields.io/badge/C%2B%2B-17+-00599C?style=flat&logo=c%2B%2B&logoColor=white)](https://en.cppreference.com/w/cpp/17)
-[![Qt Version](https://img.shields.io/badge/Qt-6+-41CD52?style=flat&logo=qt&logoColor=white)](https://www.qt.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16.3-316192?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-Free_to_Use-green.svg)](LICENSE)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/dimbo1324)
+C++ Messenger is an experimental client/server messenger prototype written in C++17 with a console client, a TCP server, PostgreSQL storage, and an optional Qt6 admin GUI.
 
-> **A cross-platform messenger with client-server architecture, built using C++(17) and Qt6. Features console client/server, admin GUI, and PostgreSQL storage.**
+It is no longer documented as production-ready. The project now has safer defaults and a more honest baseline, but it has not had a full security audit and still uses plaintext TCP unless you run it only on trusted networks or add TLS in a later change.
 
----
+## Current Features
 
-### 🌐 Documentation / Документация / Documentación
+- User registration and login.
+- Password storage as PostgreSQL `pgcrypto` bcrypt hashes in `chat.users.password_hash`.
+- Length-prefixed TCP frames with partial read/write handling.
+- PostgreSQL schema under `chat` with versioned SQL migrations.
+- Thread-safe PostgreSQL connection pool.
+- Online/offline/banned statuses with `last_seen`.
+- Message persistence, inbox, dialogue history, and online delivery to active sessions.
+- Multiple active sessions for one user are allowed; online delivery is sent to all active sessions.
+- Basic roles: `user`, `moderator`, `admin`.
+- Admin commands: list users/messages, ban, unban, kick.
+- Optional Qt6 admin GUI connected to the real framed protocol.
+- Basic protocol/auth unit tests and GitHub Actions CI.
 
-* 🇷🇺 [**Russian (Русский)**](docs/descriptions/README_rus.md)
-* 🇪🇸 [**Spanish (Español)**](docs/descriptions/README_sp.md)
+## Important Security Notes
 
----
+- Passwords are not stored as plaintext. The server hashes passwords using PostgreSQL `pgcrypto` (`crypt()` with `gen_salt('bf', 12)`).
+- `CHAT_DB_CONN` is required unless `config/server.conf` provides `db_conn`. The server refuses to start with a hardcoded password or unsafe fallback.
+- `.env` and local config files are ignored by git. Use `.env.example` and `config/server.conf.example` as templates.
+- TLS is not implemented in this pass. `ENABLE_TLS` and TLS env variables are placeholders for a future transport change. Do not use this over untrusted networks.
+- Existing plaintext-password users from the old prototype cannot be migrated safely. Recreate them or force password reset in development.
 
-## 📖 Overview
+## Architecture
 
-**C++ Messenger** is a production-ready template for building a secure, scalable messaging application. It follows a clean architecture, separating networking (TCP sockets), multithreading, database interactions, and UI components.
+- `root/app/libs/tcp`: cross-platform socket wrapper plus framed protocol helpers.
+- `root/app/server`: config, logging, auth policy, database pool, session registry, server/session command handling.
+- `root/app/client`: console client using framed TCP.
+- `root/serverGUI`: Qt6 admin GUI. Real-server mode is default; stub mode is optional.
+- `root/app/database`: versioned PostgreSQL migrations and sample data.
+- `docs/protocol.md`: current protocol format.
 
-Whether you're learning C++ or developing a real-time chat system, this project provides essential infrastructure—cross-platform sockets, thread pooling, PostgreSQL integration, and a Qt6-based admin interface—so you can focus on adding features like encryption or media support.
+## Requirements
 
-### ✨ Key Features
+- C++17 compiler.
+- CMake 3.21+.
+- PostgreSQL 16 recommended.
+- libpqxx.
+- Qt6 Widgets and Network for the GUI.
+- Docker Compose, optional, for local PostgreSQL.
 
-* **Cross-Platform Support:** Works on Linux and Windows via abstractions for sockets (POSIX/WinSock) and threads.
-* **Multithreaded Server:** Handles multiple connections using a ThreadPool for efficient task distribution.
-* **Qt6 Admin GUI:** Monitors users, filters messages, manages bans/kicks, with dark/light themes.
-* **PostgreSQL Storage:** Securely stores users, messages, logs, and online statuses using libpqxx.
-* **Console Client/Server:** Registration, login, messaging, user lists, and history viewing.
-* **Reusable Libraries:** `tcp` for sockets and `threading` for pooling and logging.
-* **Extensible Design:** Easy to add encryption, media files, push notifications, or unit tests.
+## Quick Start With Docker PostgreSQL
 
----
-
-## 🛠️ Tech Stack
-
-* **Language:** [C++ (17)](https://en.cppreference.com/w/cpp/17)
-* **UI Framework:** [Qt6](https://www.qt.io/)
-* **Database:** [PostgreSQL](https://www.postgresql.org/)
-* **Database Driver:** [libpqxx](https://github.com/jtv/libpqxx)
-* **Build System:** [CMake](https://cmake.org/)
-* **Networking:** POSIX sockets / WinSock
-* **Multithreading:** std::thread / std::mutex
-* **Other Tools:** pkg-config (for Linux/macOS), Git
-
----
-
-## 🚀 Getting Started
-
-Follow these steps to get a local copy up and running. This guide is designed for beginners—even if you're new to IT, we'll explain each step clearly.
-
-### Prerequisites
-
-Before starting, install these tools. Download links are provided.
-
-* **Git**: To clone the project. Download from [git-scm.com](https://git-scm.com/downloads). Install and add to your PATH.
-* **CMake**: Version 3.21 or higher. Download from [cmake.org](https://cmake.org/download/). Install and add to PATH.
-* **C++ Compiler**:
-  - **Windows**: Visual Studio 2019/2022 (Community edition is free). Download from [visualstudio.microsoft.com](https://visualstudio.microsoft.com/downloads). Select "Desktop development with C++" workload.
-  - **Linux (Ubuntu/Debian)**: Install GCC/Clang via terminal: `sudo apt update && sudo apt install g++ cmake`.
-  - **macOS**: Install Xcode from App Store, then Command Line Tools: `xcode-select --install`.
-* **Qt6**: Version 6 or higher (for GUI). Download the installer from [qt.io/download](https://www.qt.io/download-qt-online-installer). Install the "Desktop" components for your platform (e.g., msvc2019_64 on Windows).
-* **PostgreSQL**: Database server. Download from [postgresql.org/download](https://www.postgresql.org/download/). Install and remember the superuser password (default: "postgres").
-* **libpqxx**: C++ library for PostgreSQL.
-  - **Linux**: `sudo apt install libpqxx-dev`.
-  - **macOS**: `brew install libpqxx` (install Homebrew first: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`).
-  - **Windows**: Download source from [github.com/jtv/libpqxx](https://github.com/jtv/libpqxx), build with CMake, or use vcpkg: Install vcpkg, then `vcpkg install libpqxx:x64-windows`.
-
-Test installations:
-- Open a terminal/command prompt and run: `git --version`, `cmake --version`, `g++ --version` (or `cl` on Windows), `psql --version`.
-
-### 1. Clone the Repository
-
-Open a terminal/command prompt and run:
+Start PostgreSQL:
 
 ```bash
-git clone https://github.com/dimbo1324/c-plus-plus-messenger.git
-cd c-plus-plus-messenger
+docker compose up -d postgres
 ```
 
-This downloads the project to your computer.
-
-### 2. Environment Configuration
-
-The project uses environment variables for customization. Set them in your terminal before building/running.
-
-| Variable           | Description                          | Default Value                                                                  |
-| ------------------ | ------------------------------------ | ------------------------------------------------------------------------------ |
-| `CHAT_DB_CONN`     | Database connection string           | `host=localhost port=5432 dbname=chat_db user=postgres password=your_password` |
-| `QT_PATH`          | Path to Qt6 installation (for CMake) | (Set if not in PATH, e.g., `C:/Qt/6.5.3/msvc2019_64`)                          |
-| `CMAKE_BUILD_TYPE` | Build type (Release/Debug)           | `Release`                                                                      |
-
-On Windows: `set CHAT_DB_CONN=host=localhost port=5432 dbname=chat_db user=postgres password=your_password`
-
-On Linux/macOS: `export CHAT_DB_CONN="host=localhost port=5432 dbname=chat_db user=postgres password=your_password"`
-
-Replace `your_password` with your PostgreSQL password.
-
-### 3. Start the Database
-
-Start PostgreSQL service:
-- **Windows**: Search "Services" in Start menu, find "postgresql-x64-16", right-click > Start.
-- **Linux**: `sudo systemctl start postgresql`
-- **macOS**: `brew services start postgresql`
-
-Verify: Run `psql -U postgres` and enter your password. Type `\q` to exit.
-
-### 4. Database Migration
-
-Create the database and tables.
-
-1. Open psql: `psql -U postgres`
-2. Create database: `CREATE DATABASE chat_db;`
-3. Connect: `\c chat_db`
-4. Run the SQL script from `root/app/database/init.sql`. Copy-paste the contents into psql, or run: `psql -U postgres -d chat_db -f root/app/database/init.sql`
-5. (Optional) Add sample data: `psql -U postgres -d chat_db -f root/app/database/sample_data.sql`
-
-Create a dedicated user for security:
-- In psql: `CREATE USER chat_user WITH PASSWORD 'secure_password';`
-- Grant access: `GRANT CONNECT ON DATABASE chat_db TO chat_user; \c chat_db GRANT USAGE ON SCHEMA public TO chat_user; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO chat_user;`
-
-Update `CHAT_DB_CONN` to use `chat_user` and `secure_password`.
-
-### 5. Build the Project
-
-Create a build folder to keep things clean:
-
-```bash
-mkdir build
-cd build
-```
-
-Configure CMake:
-- **Windows** (in "x64 Native Tools Command Prompt for VS"):
-  ```bat
-  cmake -G "Visual Studio 16 2019" -A x64 -DQT_PATH="C:/Qt/6.5.3/msvc2019_64" ..
-  ```
-- **Linux/macOS**:
-  ```bash
-  cmake -DCMAKE_BUILD_TYPE=Release ..
-  ```
-
-Build:
-```bash
-cmake --build . --config Release
-```
-
-This creates executables: `chat_client`, `chat_server`, `server_gui`.
-
----
-
-## 📂 Project Structure
-
-The project follows a modular layout:
+The compose file uses development-only credentials:
 
 ```text
-c-plus-plus-messenger/
-├── .gitignore
-├── LICENSE
-├── README.md
-├── assets/                   # Resources (e.g., images for GUI)
-│   ├── 1.png
-│   └── ...
-├── CMakeLists.txt            # Root CMake: Includes all subprojects
-└── root/
-    ├── app/
-    │   ├── client/           # Console client
-    │   │   ├── CMakeLists.txt
-    │   │   ├── include/      # Client headers
-    │   │   │   ├── Client.h
-    │   │   │   └── UI.h
-    │   │   └── src/          # Client sources
-    │   │       ├── main.cpp
-    │   │       ├── Client.cpp
-    │   │       └── UI.cpp
-    │   ├── server/           # Console server
-    │   │   ├── CMakeLists.txt
-    │   │   ├── include/      # Server headers
-    │   │   │   ├── ClientHandler.h
-    │   │   │   ├── Database.h
-    │   │   │   ├── Logger.h
-    │   │   │   └── Server.h
-    │   │   └── src/          # Server sources
-    │   │       ├── main.cpp
-    │   │       ├── Server.cpp
-    │   │       ├── ClientHandler.cpp
-    │   │       ├── Database.cpp
-    │   │       └── Logger.cpp
-    │   ├── libs/             # Shared libraries
-    │   │   ├── tcp/          # TCP sockets abstraction
-    │   │   │   ├── CMakeLists.txt
-    │   │   │   ├── include/
-    │   │   │   │   └── tcp/
-    │   │   │   │       ├── ISocket.h
-    │   │   │   │       ├── SocketFactory.h
-    │   │   │   │       ├── TcpSocketLinux.h
-    │   │   │   │       └── TcpSocketWin.h
-    │   │   │   └── src/
-    │   │   │       ├── SocketFactory.cpp
-    │   │   │       ├── TcpSocketLinux.cpp
-    │   │   │       └── TcpSocketWin.cpp
-    │   │   └── threading/    # ThreadPool and Logger
-    │   │       ├── CMakeLists.txt
-    │   │       ├── include/
-    │   │       │   ├── threading_config.h
-    │   │       │   └── threading/
-    │   │       │       ├── Logger.h
-    │   │       │       └── ThreadPool.h
-    │   │       └── src/
-    │   │           ├── Logger.cpp
-    │   │           └── ThreadPool.cpp
-    │   ├── database/         # SQL scripts
-    │   │   ├── init.sql
-    │   │   ├── sample_data.sql
-    │   │   └── README.md
-    │   └── logs/             # Server logs
-    │       └── user_activity.log
-    └── serverGUI/            # Qt6 admin GUI
-        ├── CMakeLists.txt
-        ├── include/
-        │   └── MainWindowServer.h
-        ├── src/
-        │   ├── main.cpp
-        │   └── mainwindowserver.cpp
-        └── ui/
-            └── MainWindowServer.ui
+database: messenger_dev
+app user: messenger_app
+app password: messenger_dev_password
 ```
 
----
-
-## 🔌 Usage
-
-### Server
+Set the connection string:
 
 ```bash
-cd build/root/app/server/Release  # or Debug
-./chat_server 8080
+export CHAT_DB_CONN="host=localhost port=5432 dbname=messenger_dev user=messenger_app password=messenger_dev_password"
 ```
 
-Output: "Server listening on port 8080". Logs in `../logs/user_activity.log`.
+On Windows PowerShell:
 
-### Client
+```powershell
+$env:CHAT_DB_CONN="host=localhost port=5432 dbname=messenger_dev user=messenger_app password=messenger_dev_password"
+```
+
+If the database volume already existed before migrations were mounted, apply migrations manually with an owner/admin connection:
 
 ```bash
-cd build/root/app/client/Release
-./chat_client 127.0.0.1:8080
+psql "host=localhost port=5432 dbname=messenger_dev user=postgres password=postgres_dev_password" -f root/app/database/init.sql
 ```
 
-Follow menu: Register/Login, then send messages, view lists/history.
-
-### Admin GUI
+Optional sample data:
 
 ```bash
-cd build/root/serverGUI/Release
-./server_gui
+psql "host=localhost port=5432 dbname=messenger_dev user=postgres password=postgres_dev_password" -f root/app/database/sample_data.sql
 ```
 
-Refresh users/messages, filter, ban/kick. Uses stubs by default (edit CMake to disable).
+The sample accounts are development-only:
 
----
+```text
+alice / AliceDev12345
+bob   / BobDev12345
+carol / CarolDev12345
+```
 
-## 🤝 Contributing
+They are inserted with bcrypt hashes generated by `pgcrypto`; do not reuse these credentials outside local development.
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+## Local Build
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+Configure server, client, and tests without GUI:
 
----
+```bash
+cmake -S . -B build -DBUILD_GUI=OFF -DBUILD_TESTS=ON
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
 
-## 📜 License
+Build with GUI:
 
-This project is free to use.
+```bash
+cmake -S . -B build -DBUILD_GUI=ON -DQT_PATH=/path/to/Qt
+cmake --build build --parallel
+```
 
----
+Useful CMake options:
 
-## 📬 Contact
+```text
+BUILD_CLIENT=ON
+BUILD_SERVER=ON
+BUILD_GUI=ON
+BUILD_TESTS=ON
+USE_STUB=OFF
+ENABLE_TLS=OFF
+ENABLE_WARNINGS=ON
+ENABLE_SANITIZERS=OFF
+```
 
-If you have questions, suggestions, or just want to say hi, feel free to reach out!
+`USE_STUB=ON` is only for GUI demo data. Normal builds should leave it off.
 
-* **Author:** dimbo1324
-* **Telegram:** [@dimbo1324](https://t.me/dimbo1324)
-* **Email:** dimaprihodko180@gmail.com
-* **GitHub:** [github.com/dimbo1324](https://github.com/dimbo1324)
+## Configuration
 
----
+Environment variables take precedence over `config/server.conf`.
 
-*Developed with ❤️ by dimbo1324*
+```text
+CHAT_DB_CONN             required unless db_conn exists in config/server.conf
+CHAT_SERVER_PORT         default 8080
+CHAT_DB_POOL_SIZE        default 4
+CHAT_MAX_CLIENTS         default 64
+CHAT_READ_TIMEOUT_SEC    default 300
+CHAT_MAX_FRAME_SIZE      default 65536
+CHAT_LOG_PATH            default logs/user_activity.log
+```
+
+GUI variables:
+
+```text
+CHAT_GUI_HOST
+CHAT_GUI_PORT
+CHAT_GUI_ADMIN_LOGIN
+CHAT_GUI_ADMIN_PASSWORD
+```
+
+The GUI logs in before each admin command. The account must exist and have `admin` or `moderator` role.
+
+## Database Migrations
+
+Migration files live in `root/app/database/migrations`.
+
+Apply all migrations with a database owner/admin connection because migrations create a schema, extension, tables, and grants:
+
+```bash
+psql "<admin-or-owner-connection-string>" -f root/app/database/init.sql
+```
+
+Reset a local development database:
+
+```bash
+dropdb messenger_dev
+createdb messenger_dev
+psql "<admin-or-owner-connection-string>" -f root/app/database/init.sql
+```
+
+The schema contains:
+
+- `chat.users`
+- `chat.messages`
+- `chat.audit_log`
+
+Statuses are constrained to:
+
+```text
+online
+offline
+banned
+```
+
+Roles are constrained to:
+
+```text
+user
+moderator
+admin
+```
+
+## Running
+
+Server:
+
+```bash
+./build/root/app/server/chat_server
+```
+
+Optional CLI port override:
+
+```bash
+./build/root/app/server/chat_server 8080
+```
+
+Client:
+
+```bash
+./build/root/app/client/chat_client 127.0.0.1:8080
+```
+
+GUI:
+
+```bash
+CHAT_GUI_HOST=127.0.0.1 CHAT_GUI_PORT=8080 CHAT_GUI_ADMIN_LOGIN=admin CHAT_GUI_ADMIN_PASSWORD=... ./build/root/serverGUI/server_gui
+```
+
+## Creating an Admin User for Development
+
+Register a user through the client, then promote it locally:
+
+```sql
+UPDATE chat.users SET role = 'admin' WHERE login = 'admin';
+```
+
+Do not use shared development passwords outside a local machine.
+
+## Protocol
+
+The TCP protocol uses a 4-byte big-endian length prefix followed by a UTF-8 payload. See `docs/protocol.md`.
+
+## Tests
+
+Current tests cover:
+
+- frame encoder/decoder partial data;
+- multiple frames in one buffer;
+- oversized frames;
+- basic password/login policy.
+
+Run:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+Integration tests with a live PostgreSQL database are not yet implemented.
+
+## Troubleshooting
+
+- `CHAT_DB_CONN is not set`: set the environment variable or create `config/server.conf` from `config/server.conf.example`.
+- `pgcrypto` errors: apply migrations as a database owner that can run `CREATE EXTENSION IF NOT EXISTS pgcrypto`.
+- GUI says admin login failed: verify `CHAT_GUI_ADMIN_LOGIN`, `CHAT_GUI_ADMIN_PASSWORD`, and the user's role.
+- Client cannot connect: check server port, firewall, and `CHAT_SERVER_PORT`.
+
+## Known Limitations
+
+- TLS transport is not implemented yet.
+- Payloads are text commands, not JSON or protobuf.
+- There is no end-to-end encryption.
+- Admin GUI authentication is env-driven, not an interactive login form.
+- No automated PostgreSQL integration tests yet.
+- Thread-per-client with a connection limit is safer than the old fixed worker pool, but it is not a high-scale async server.
+
+## Roadmap
+
+- Add real TLS transport with certificate configuration.
+- Replace text payloads with JSON or a typed binary protocol.
+- Add PostgreSQL-backed integration tests.
+- Add password reset and account recovery flows.
+- Add interactive admin login in the GUI.
+- Add rate limiting and brute-force protection.
+
+## License
+
+No repository license file is currently specified. Add a real `LICENSE` file before distributing this project as open source.

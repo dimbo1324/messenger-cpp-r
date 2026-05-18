@@ -1,17 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 project(server_gui LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
-message(STATUS "Qt6 version: ${Qt6_VERSION}")
 
 file(GLOB SERVERGUI_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 file(GLOB SERVERGUI_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
@@ -32,11 +27,14 @@ target_link_libraries(server_gui PRIVATE
     Qt6::Network
 )
 
-
-target_compile_definitions(server_gui PRIVATE USE_STUB)
-
-if(WIN32)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
+if(TARGET project_options)
+    target_link_libraries(server_gui PRIVATE project_options)
 endif()
 
-message(STATUS "server_gui target created")
+if(USE_STUB)
+    target_compile_definitions(server_gui PRIVATE USE_STUB)
+endif()
+
+if(WIN32)
+    set_target_properties(server_gui PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()

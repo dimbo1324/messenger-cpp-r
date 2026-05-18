@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: messenger-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: messenger_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_password
+      MESSENGER_APP_USER: messenger_app
+      MESSENGER_APP_PASSWORD: messenger_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - messenger-postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+      - ./root/app/database:/database:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d messenger_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  messenger-postgres-data:

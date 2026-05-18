@@ -1,0 +1,15 @@
+# Development-only server config example.
+# CHAT_DB_CONN from the environment takes precedence over db_conn.
+
+db_conn=host=localhost port=5432 dbname=messenger_dev user=messenger_app password=messenger_dev_password
+server_port=8080
+db_pool_size=4
+max_clients=64
+read_timeout_sec=300
+max_frame_size=65536
+log_path=logs/user_activity.log
+
+# TLS placeholders. The current transport remains plaintext TCP.
+tls_enabled=0
+tls_cert=
+tls_key=

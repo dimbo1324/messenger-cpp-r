@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(chat_client LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 add_executable(chat_client
     src/main.cpp
     src/Client.cpp
@@ -20,4 +16,6 @@ target_link_libraries(chat_client PRIVATE
     threading
 )
 
-message(STATUS "chat_client target created")
+if(TARGET project_options)
+    target_link_libraries(chat_client PRIVATE project_options)
+endif()
